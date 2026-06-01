@@ -108,14 +108,18 @@ export class GraphExpandManager {
     });
   }
 
-  searchFirst(keyword: string): KnowledgeNode | undefined {
+  search(keyword: string): KnowledgeNode[] {
     const text = keyword.trim().toLowerCase();
-    if (!text) return undefined;
-    return [...this.dataset.nodeMap.values()].find((node) => {
+    if (!text) return [];
+    return [...this.dataset.nodeMap.values()].filter((node) => {
       return [node.id, node.label, node.code, node.name, node.mapping]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(text));
     });
+  }
+
+  searchFirst(keyword: string): KnowledgeNode | undefined {
+    return this.search(keyword)[0];
   }
 
   private getPathToRoot(id: string): string[] {

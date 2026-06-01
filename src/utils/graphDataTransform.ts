@@ -93,9 +93,9 @@ const TYPE_COLORS: Record<KnowledgeNodeType, string> = {
   root: '#38bdf8',
   system: '#8b5cf6',
   'survey-category': '#fb7185',
-  'planning-category': '#2dd4bf',
+  'planning-category': '#84cc16',
   'survey-detail': '#f59e0b',
-  'planning-detail': '#2563eb',
+  'planning-detail': '#a855f7',
 };
 
 const TYPE_SIZES: Record<KnowledgeNodeType, number> = {
@@ -235,9 +235,9 @@ export function nodeTypeText(type: KnowledgeNodeType): string {
 }
 
 function resolveNodeColor(type: KnowledgeNodeType, level: number, levelName?: string): string {
-  if (levelName === '三级类' || level >= 4) return '#14b8a6';
+  if (levelName === '三级类' || level >= 4) return '#ef4444';
   if (levelName === '二级类' || level === 3) {
-    return type === 'survey-detail' ? '#f59e0b' : '#2563eb';
+    return type === 'survey-detail' ? '#f59e0b' : '#a855f7';
   }
   return TYPE_COLORS[type] || '#64748b';
 }

@@ -23,12 +23,14 @@ const tooltip = ref({
   top: 0,
   rows: [] as Array<[string, string]>,
 });
+const searchResults = ref<KnowledgeNode[]>([]);
+const searchKeyword = ref('');
 const activeLegendId = ref('');
 const hoveredLegendId = ref('');
 const overviewItems = ref<Array<[string, string]>>([]);
 const legendCollapsed = ref(false);
 const overviewCollapsed = ref(false);
-const relationLabelsVisible = ref(true);
+const relationLabelsVisible = ref(false);
 
 let manager: GraphExpandManager;
 let svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -46,9 +48,9 @@ const legendItems: LegendItem[] = [
   { id: 'system', type: 'system', label: '分类体系', color: '#8b5cf6' },
   { id: 'survey-first', type: 'survey-category', levelName: '一级类', label: '国土调查一级类', color: '#fb7185' },
   { id: 'survey-second', type: 'survey-detail', levelName: '二级类', label: '国土调查二级类', color: '#f59e0b' },
-  { id: 'planning-first', type: 'planning-category', levelName: '一级类', label: '用地用海一级类', color: '#2dd4bf' },
-  { id: 'planning-second', type: 'planning-detail', levelName: '二级类', label: '用地用海二级类', color: '#2563eb' },
-  { id: 'planning-third', type: 'planning-detail', levelName: '三级类', label: '用地用海三级类', color: '#14b8a6' },
+  { id: 'planning-first', type: 'planning-category', levelName: '一级类', label: '用地用海一级类', color: '#84cc16' },
+  { id: 'planning-second', type: 'planning-detail', levelName: '二级类', label: '用地用海二级类', color: '#a855f7' },
+  { id: 'planning-third', type: 'planning-detail', levelName: '三级类', label: '用地用海三级类', color: '#ef4444' },
 ];
 
 const activeLegendLabel = computed(() => {
@@ -122,6 +124,8 @@ function initSvg() {
     .force('center', d3.forceCenter(0, 0))
     .force('x', d3.forceX<D3Node>((node) => node.x || 0).strength(0.045))
     .force('y', d3.forceY<D3Node>((node) => node.y || 0).strength(0.045))
+    .alphaDecay(0.045)
+    .velocityDecay(0.48)
     .on('tick', ticked);
 
   resetView();
@@ -131,6 +135,9 @@ function updateGraph(focusId?: string) {
   const data = manager.getVisibleGraph();
   const nodes = data.nodes.map((node) => toD3Node(node));
   const links = data.edges.map((edge) => ({ ...edge })) as D3Link[];
+  const labelLinks = relationLabelsVisible.value
+    ? links.filter((link) => simplifyEdgeLabel(link))
+    : [];
   updateOverview(data.nodes, data.edges);
 
   const linkSelection = linkLayer
@@ -157,7 +164,7 @@ function updateGraph(focusId?: string) {
 
   const linkLabelSelection = linkLabelLayer
     .selectAll<SVGTextElement, D3Link>('text')
-    .data(links, (link: any) => link.id);
+    .data(labelLinks, (link: any) => link.id);
 
   linkLabelSelection
     .exit()
@@ -254,7 +261,7 @@ function updateGraph(focusId?: string) {
   simulation.nodes(nodes);
   const linkForce = simulation.force<d3.ForceLink<D3Node, D3Link>>('link');
   linkForce?.links(links);
-  simulation.alpha(0.76).restart();
+  simulation.alpha(0.58).restart();
 
   if (focusId) {
     window.setTimeout(() => focusNode(focusId), 120);
@@ -553,6 +560,7 @@ function matchesLegend(node: D3Node, legend: LegendItem): boolean {
 
 function toggleRelationLabels() {
   relationLabelsVisible.value = !relationLabelsVisible.value;
+  updateGraph(selectedNode.value?.id);
 }
 
 function updateOverview(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
@@ -564,6 +572,7 @@ function updateOverview(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
     ['用地用海节点', String(typeCount('planning-category') + typeCount('planning-detail'))],
     ['一级类', String(nodes.filter((node) => node.levelName === '一级类').length)],
     ['二级类', String(nodes.filter((node) => node.levelName === '二级类').length)],
+    ['三级类', String(nodes.filter((node) => node.levelName === '三级类').length)],
     ['对应关系', String(edges.filter((edge) => edge.relationType === 'mapping' || edge.label === '对应').length)],
   ];
 }
@@ -592,15 +601,22 @@ function focusNode(id: string) {
 }
 
 function searchNode(keyword: string) {
-  const target = manager.searchFirst(keyword);
-  if (!target) {
+  searchKeyword.value = keyword.trim();
+  searchResults.value = manager.search(keyword);
+  if (!searchResults.value.length) {
     message.value = keyword.trim() ? '未搜索到匹配节点' : '请输入搜索关键词';
     return;
   }
   message.value = '';
+  if (searchResults.value.length === 1) selectSearchResult(searchResults.value[0]);
+}
+
+function selectSearchResult(target: KnowledgeNode) {
+  searchResults.value = [];
   manager.revealNode(target.id);
   selectedNode.value = manager.getNode(target.id);
   updateGraph(target.id);
+  window.requestAnimationFrame(() => focusNode(target.id));
 }
 
 function expandAll() {
@@ -624,7 +640,7 @@ function relayout() {
     node.fx = null;
     node.fy = null;
   });
-  simulation.alpha(0.95).restart();
+  simulation.alpha(0.68).restart();
 }
 
 function switchVersion() {
@@ -668,6 +684,22 @@ function targetId(link: D3Link): string {
     <main class="kg-shell">
       <div ref="stageRef" class="kg-stage kg-stage--light" :class="{ 'is-link-label-hidden': !relationLabelsVisible }">
         <div v-if="message" class="kg-message kg-message--light">{{ message }}</div>
+        <div v-if="searchResults.length > 1" class="kg-search-results">
+          <div class="kg-search-results__header">
+            <strong>搜索结果</strong>
+            <span>{{ searchKeyword }} · {{ searchResults.length }} 个</span>
+          </div>
+          <button
+            v-for="node in searchResults"
+            :key="node.id"
+            type="button"
+            class="kg-search-results__item"
+            @click="selectSearchResult(node)"
+          >
+            <span>{{ formatNodeName(node) }}</span>
+            <small>{{ node.levelName }} · {{ node.system || node.parentLabel }}</small>
+          </button>
+        </div>
         <svg ref="svgRef" class="kg-d3-svg" role="img" aria-label="D3 用地用海分类知识图谱"></svg>
         <div class="kg-legend kg-floating-panel" :class="{ 'is-collapsed': legendCollapsed }">
           <button type="button" class="kg-panel-header" @click="legendCollapsed = !legendCollapsed">

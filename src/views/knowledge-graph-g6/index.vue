@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import G6 from '@antv/g6';
 import * as d3 from 'd3';
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import KnowledgeGraphDetailPanel from '../../components/KnowledgeGraphDetailPanel.vue';
 import KnowledgeGraphToolbar from '../../components/KnowledgeGraphToolbar.vue';
 import rawGraphData from '../../data/landSeaKnowledgeGraph3.json';
-import { transformKnowledgeGraph, type KnowledgeEdge, type KnowledgeNode, type RawKnowledgeGraph } from '../../utils/graphDataTransform';
+import { formatNodeName, transformKnowledgeGraph, type KnowledgeEdge, type KnowledgeNode, type KnowledgeNodeType, type RawKnowledgeGraph } from '../../utils/graphDataTransform';
 import { GraphExpandManager } from '../../utils/graphExpandManager';
 
 const router = useRouter();
 const containerRef = ref<HTMLDivElement | null>(null);
 const selectedNode = ref<KnowledgeNode>();
 const message = ref('');
-const relationLabelsVisible = ref(true);
+const relationLabelsVisible = ref(false);
+const searchResults = ref<KnowledgeNode[]>([]);
+const searchKeyword = ref('');
+const overviewItems = ref<Array<[string, string]>>([]);
+const legendCollapsed = ref(false);
+const overviewCollapsed = ref(false);
+const activeLegendId = ref('');
+const hoveredLegendId = ref('');
 const tooltip = ref({
   visible: false,
   left: 0,
@@ -28,6 +35,22 @@ let resizeFrame = 0;
 let graphWidth = 0;
 let graphHeight = 0;
 const layoutCache = new Map<string, { x: number; y: number }>();
+
+type LegendItem = { id: string; type: KnowledgeNodeType; levelName?: string; label: string; color: string };
+
+const legendItems: LegendItem[] = [
+  { id: 'root', type: 'root', label: '中心主题', color: '#38bdf8' },
+  { id: 'system', type: 'system', label: '分类体系', color: '#8b5cf6' },
+  { id: 'survey-first', type: 'survey-category', levelName: '一级类', label: '国土调查一级类', color: '#fb7185' },
+  { id: 'survey-second', type: 'survey-detail', levelName: '二级类', label: '国土调查二级类', color: '#f59e0b' },
+  { id: 'planning-first', type: 'planning-category', levelName: '一级类', label: '用地用海一级类', color: '#84cc16' },
+  { id: 'planning-second', type: 'planning-detail', levelName: '二级类', label: '用地用海二级类', color: '#a855f7' },
+  { id: 'planning-third', type: 'planning-detail', levelName: '三级类', label: '用地用海三级类', color: '#ef4444' },
+];
+
+const activeLegendLabel = computed(() => {
+  return legendItems.find((item) => item.id === activeLegendId.value)?.label;
+});
 
 try {
   const dataset = transformKnowledgeGraph(rawGraphData as RawKnowledgeGraph);
@@ -189,6 +212,8 @@ function mountGraphWhenReady(retryCount = 0) {
 
 function renderGraph(focusId?: string) {
   if (!graph || !containerRef.value) return;
+  const visibleData = manager.getVisibleGraph();
+  updateOverview(visibleData.nodes, visibleData.edges);
   const graphData = toG6Data();
   if (graphRendered) {
     graph.changeData(graphData);
@@ -201,6 +226,7 @@ function renderGraph(focusId?: string) {
   graph.getEdges().forEach((item: any) => graph.clearItemStates(item));
 
   applySelectedState(focusId);
+  applyLegendState();
 }
 
 function toG6Data() {
@@ -321,12 +347,12 @@ function buildForceLayout(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
         return -300;
       }),
     )
-    .force('collide', d3.forceCollide<any>().radius((node) => node.size / 2 + 34).iterations(4))
-    .force('x', d3.forceX<any>((node) => node.x || 0).strength(0.08))
-    .force('y', d3.forceY<any>((node) => node.y || 0).strength(0.08))
+    .force('collide', d3.forceCollide<any>().radius((node) => node.size / 2 + 30).iterations(2))
+    .force('x', d3.forceX<any>((node) => node.x || 0).strength(0.06))
+    .force('y', d3.forceY<any>((node) => node.y || 0).strength(0.06))
     .stop();
 
-  for (let index = 0; index < 180; index += 1) {
+  for (let index = 0; index < 110; index += 1) {
     simulation.tick();
   }
 
@@ -412,6 +438,50 @@ function applySelectedState(focusId?: string) {
     graph.setItemState(item, 'inactive', Boolean(selectedId && !selected));
     setSelectedEdgeTextState(item, selected);
   });
+}
+
+function setLegendHover(id: string) {
+  hoveredLegendId.value = id;
+  applyLegendState();
+}
+
+function toggleLegend(id: string) {
+  activeLegendId.value = activeLegendId.value === id ? '' : id;
+  applyLegendState();
+}
+
+function applyLegendState() {
+  if (!graph) return;
+  const legend = legendItems.find((item) => item.id === (activeLegendId.value || hoveredLegendId.value));
+  graph.getNodes().forEach((item: any) => {
+    const node = item.getModel().origin as KnowledgeNode | undefined;
+    const dim = Boolean(legend && node && !matchesLegend(node, legend));
+    graph.updateItem(item, {
+      style: {
+        ...item.getModel().style,
+        opacity: dim ? 0.14 : 0.92,
+      },
+    });
+  });
+}
+
+function matchesLegend(node: KnowledgeNode, legend: LegendItem): boolean {
+  if (node.type !== legend.type) return false;
+  return !legend.levelName || node.levelName === legend.levelName;
+}
+
+function updateOverview(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
+  const typeCount = (type: KnowledgeNodeType) => nodes.filter((node) => node.type === type).length;
+  overviewItems.value = [
+    ['实体节点', String(nodes.length)],
+    ['实体关系', String(edges.length)],
+    ['国土调查节点', String(typeCount('survey-category') + typeCount('survey-detail'))],
+    ['用地用海节点', String(typeCount('planning-category') + typeCount('planning-detail'))],
+    ['一级类', String(nodes.filter((node) => node.levelName === '一级类').length)],
+    ['二级类', String(nodes.filter((node) => node.levelName === '二级类').length)],
+    ['三级类', String(nodes.filter((node) => node.levelName === '三级类').length)],
+    ['对应关系', String(edges.filter((edge) => edge.relationType === 'mapping' && edge.label).length)],
+  ];
 }
 
 function setSelectedEdgeTextState(item: any, selected: boolean) {
@@ -506,12 +576,18 @@ function toggleRelationLabels() {
 }
 
 function searchNode(keyword: string) {
-  const target = manager.searchFirst(keyword);
-  if (!target) {
+  searchKeyword.value = keyword.trim();
+  searchResults.value = manager.search(keyword);
+  if (!searchResults.value.length) {
     message.value = keyword.trim() ? '未搜索到匹配节点' : '请输入搜索关键词';
     return;
   }
   message.value = '';
+  if (searchResults.value.length === 1) selectSearchResult(searchResults.value[0]);
+}
+
+function selectSearchResult(target: KnowledgeNode) {
+  searchResults.value = [];
   manager.revealNode(target.id);
   selectedNode.value = manager.getNode(target.id);
   renderGraph(target.id);
@@ -540,9 +616,59 @@ function switchVersion() {
       @switch-version="switchVersion"
     />
     <main class="kg-shell">
-      <div class="kg-stage kg-stage--dark">
+      <div class="kg-stage kg-stage--light">
         <div v-if="message" class="kg-message">{{ message }}</div>
+        <div v-if="searchResults.length > 1" class="kg-search-results">
+          <div class="kg-search-results__header">
+            <strong>搜索结果</strong>
+            <span>{{ searchKeyword }} · {{ searchResults.length }} 个</span>
+          </div>
+          <button
+            v-for="node in searchResults"
+            :key="node.id"
+            type="button"
+            class="kg-search-results__item"
+            @click="selectSearchResult(node)"
+          >
+            <span>{{ formatNodeName(node) }}</span>
+            <small>{{ node.levelName }} · {{ node.system || node.parentLabel }}</small>
+          </button>
+        </div>
         <div ref="containerRef" class="kg-canvas"></div>
+        <div class="kg-legend kg-floating-panel" :class="{ 'is-collapsed': legendCollapsed }">
+          <button type="button" class="kg-panel-header" @click="legendCollapsed = !legendCollapsed">
+            <span class="kg-floating-title">图例</span>
+            <span class="kg-panel-toggle">{{ legendCollapsed ? '展开' : '收起' }}</span>
+          </button>
+          <div class="kg-panel-body kg-legend__body">
+            <button
+              v-for="item in legendItems"
+              :key="item.id"
+              type="button"
+              class="kg-legend__item"
+              :class="{ 'is-active': activeLegendId === item.id }"
+              @mouseenter="setLegendHover(item.id)"
+              @mouseleave="setLegendHover('')"
+              @click="toggleLegend(item.id)"
+            >
+              <span class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
+              <span>{{ item.label }}</span>
+            </button>
+            <div v-if="activeLegendLabel" class="kg-legend__hint">已筛选：{{ activeLegendLabel }}</div>
+          </div>
+        </div>
+        <div class="kg-overview kg-floating-panel" :class="{ 'is-collapsed': overviewCollapsed }">
+          <button type="button" class="kg-panel-header" @click="overviewCollapsed = !overviewCollapsed">
+            <span class="kg-floating-title">数据概览</span>
+            <span class="kg-panel-toggle">{{ overviewCollapsed ? '展开' : '收起' }}</span>
+          </button>
+          <div class="kg-panel-body">
+            <dl v-for="[label, value] in overviewItems" :key="label">
+              <dt>{{ label }}</dt>
+              <dd>{{ value }}</dd>
+            </dl>
+          </div>
+        </div>
         <div
           v-if="tooltip.visible"
           class="kg-node-tooltip"
