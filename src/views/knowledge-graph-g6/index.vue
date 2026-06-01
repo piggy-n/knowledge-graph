@@ -97,19 +97,19 @@ function initGraph() {
     },
     nodeStateStyles: {
       active: {
-        stroke: '#0f172a',
-        lineWidth: 4,
-        shadowColor: '#38bdf8',
-        shadowBlur: 18,
-      },
-      inactive: {
-        opacity: 0.18,
-      },
-      selected: {
         stroke: '#f59e0b',
         lineWidth: 4,
         shadowColor: '#f59e0b',
-        shadowBlur: 22,
+        shadowBlur: 18,
+      },
+      inactive: {
+        opacity: 0.14,
+      },
+      selected: {
+        stroke: '#597EF7',
+        lineWidth: 5,
+        shadowColor: '#597EF7',
+        shadowBlur: 26,
       },
     },
     edgeStateStyles: {
@@ -118,8 +118,13 @@ function initGraph() {
         lineWidth: 2.8,
         opacity: 1,
       },
+      selected: {
+        stroke: '#597EF7',
+        lineWidth: 3.2,
+        opacity: 1,
+      },
       inactive: {
-        opacity: 0.08,
+        opacity: 0.1,
       },
     },
   });
@@ -130,6 +135,12 @@ function initGraph() {
     manager.toggle(id);
     selectedNode.value = manager.getNode(id);
     renderGraph(id);
+  });
+
+  graph.on('canvas:click', () => {
+    selectedNode.value = undefined;
+    clearHover();
+    applySelectedState();
   });
 
   graph.on('node:mouseenter', (event: any) => {
@@ -153,7 +164,10 @@ function initGraph() {
   });
 
   graph.on('edge:mouseleave', (event: any) => {
-    if (event.item) setEdgeTextState(event.item, false);
+    if (event.item) {
+      setEdgeTextState(event.item, false);
+      applySelectedState();
+    }
   });
 }
 
@@ -185,11 +199,7 @@ function renderGraph(focusId?: string) {
   graph.getNodes().forEach((item: any) => graph.clearItemStates(item));
   graph.getEdges().forEach((item: any) => graph.clearItemStates(item));
 
-  const selectedId = focusId || selectedNode.value?.id;
-  const selectedItem = selectedId ? graph.findById(selectedId) : undefined;
-  if (selectedItem) {
-    graph.setItemState(selectedItem, 'selected', true);
-  }
+  applySelectedState(focusId);
 }
 
 function toG6Data() {
@@ -380,6 +390,45 @@ function clearHover() {
   graph.getEdges().forEach((item: any) => {
     graph.setItemState(item, 'active', false);
     graph.setItemState(item, 'inactive', false);
+  });
+  applySelectedState();
+}
+
+function applySelectedState(focusId?: string) {
+  if (!graph) return;
+  const selectedId = focusId || selectedNode.value?.id;
+  const relatedIds = selectedId ? manager.getConnectedIds(selectedId) : new Set<string>();
+  graph.getNodes().forEach((item: any) => {
+    const itemId = item.getModel().id;
+    graph.setItemState(item, 'selected', itemId === selectedId);
+    graph.setItemState(item, 'inactive', Boolean(selectedId && !relatedIds.has(itemId)));
+  });
+  graph.getEdges().forEach((item: any) => {
+    const model = item.getModel();
+    const selected = Boolean(selectedId && (model.source === selectedId || model.target === selectedId));
+    graph.setItemState(item, 'selected', selected);
+    graph.setItemState(item, 'inactive', Boolean(selectedId && !selected));
+    setSelectedEdgeTextState(item, selected);
+  });
+}
+
+function setSelectedEdgeTextState(item: any, selected: boolean) {
+  const model = item.getModel();
+  graph.updateItem(item, {
+    labelCfg: {
+      ...model.labelCfg,
+      style: {
+        ...model.labelCfg?.style,
+        fill: selected ? '#3151c9' : model.originLabelFill || model.labelCfg?.style?.fill,
+        fontSize: selected ? 12 : model.originFontSize || model.labelCfg?.style?.fontSize,
+        fontWeight: selected ? 800 : model.originFontWeight || model.labelCfg?.style?.fontWeight,
+        background: {
+          fill: selected ? 'rgba(235, 242, 255, 0.96)' : 'rgba(255, 255, 255, 0.78)',
+          padding: [3, 6, 3, 6],
+          radius: 5,
+        },
+      },
+    },
   });
 }
 

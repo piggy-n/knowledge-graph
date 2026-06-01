@@ -87,7 +87,15 @@ function initSvg() {
     .scaleExtent([0.22, 3.2])
     .on('zoom', (event) => viewport.attr('transform', event.transform.toString()));
 
-  svg.call(zoomBehavior).on('dblclick.zoom', null);
+  svg
+    .call(zoomBehavior)
+    .on('dblclick.zoom', null)
+    .on('click', (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (target === svgRef.value || target?.classList.contains('d3-viewport')) {
+        clearSelectedNode();
+      }
+    });
   simulation = d3
     .forceSimulation<D3Node>()
     .force(
@@ -194,6 +202,11 @@ function updateGraph(focusId?: string) {
 
   nodeEnter
     .append('circle')
+    .attr('class', 'd3-node-halo')
+    .attr('r', (node) => node.size / 2 + 7);
+
+  nodeEnter
+    .append('circle')
     .attr('r', (node) => node.size / 2)
     .attr('fill', (node) => node.color);
 
@@ -229,10 +242,10 @@ function updateGraph(focusId?: string) {
 
   nodeLayer
     .selectAll<SVGGElement, D3Node>('g')
-    .classed('is-selected', (node) => node.id === selectedNode.value?.id)
     .classed('is-expanded', (node) => Boolean(node.expanded))
     .classed('is-fixed', (node) => Boolean(node.fx != null || node.fy != null));
 
+  applySelectedState();
   applyLegendState();
 
   simulation.nodes(nodes);
@@ -359,6 +372,32 @@ function clearHover() {
   linkLayer.selectAll('line').classed('is-hot', false).classed('is-dim', false);
   linkLabelLayer.selectAll('text').classed('is-hot', false).classed('is-dim', false);
   applyLegendState();
+  applySelectedState();
+}
+
+function applySelectedState() {
+  if (!nodeLayer || !linkLayer || !linkLabelLayer) return;
+  const id = selectedNode.value?.id;
+  const related = id ? manager.getConnectedIds(id) : new Set<string>();
+  nodeLayer
+    .selectAll<SVGGElement, D3Node>('g')
+    .classed('is-selected', (node) => node.id === id)
+    .classed('is-selected-related', (node) => Boolean(id && related.has(node.id) && node.id !== id))
+    .classed('is-selected-dim', (node) => Boolean(id && !related.has(node.id)));
+  linkLayer
+    .selectAll<SVGLineElement, D3Link>('line')
+    .classed('is-selected-link', (link) => Boolean(id && (sourceId(link) === id || targetId(link) === id)))
+    .classed('is-selected-dim', (link) => Boolean(id && sourceId(link) !== id && targetId(link) !== id));
+  linkLabelLayer
+    .selectAll<SVGTextElement, D3Link>('text')
+    .classed('is-selected-link', (link) => Boolean(id && (sourceId(link) === id || targetId(link) === id)))
+    .classed('is-selected-dim', (link) => Boolean(id && sourceId(link) !== id && targetId(link) !== id));
+}
+
+function clearSelectedNode() {
+  selectedNode.value = undefined;
+  clearHover();
+  applySelectedState();
 }
 
 function renderNodeText(selection: d3.Selection<SVGTextElement, D3Node, null, undefined>, node: D3Node) {

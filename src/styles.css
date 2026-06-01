@@ -592,8 +592,18 @@ button {
   opacity: 1 !important;
 }
 
+.d3-link.is-selected-link {
+  stroke: #597ef7;
+  stroke-width: 3;
+  opacity: 1 !important;
+}
+
 .d3-link.is-dim {
   opacity: 0.08 !important;
+}
+
+.d3-link.is-selected-dim {
+  opacity: 0.12;
 }
 
 .d3-link-label {
@@ -627,8 +637,18 @@ button {
   opacity: 1 !important;
 }
 
+.d3-link-label.is-selected-link {
+  fill: #3151c9;
+  font-size: 12px;
+  opacity: 1 !important;
+}
+
 .d3-link-label.is-dim {
   opacity: 0.1 !important;
+}
+
+.d3-link-label.is-selected-dim {
+  opacity: 0.14;
 }
 
 .d3-node {
@@ -646,7 +666,18 @@ button {
     filter 0.2s ease;
 }
 
-.d3-node--root circle {
+.d3-node .d3-node-halo {
+  fill: rgba(89, 126, 247, 0.16);
+  stroke: #597ef7;
+  stroke-width: 2.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.92);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.d3-node--root circle:not(.d3-node-halo) {
   animation: d3Pulse 2.6s ease-in-out infinite;
   stroke-width: 3;
 }
@@ -675,19 +706,38 @@ button {
   stroke-width: 3px;
 }
 
-.d3-node.is-hot circle,
-.d3-node.is-selected circle {
-  stroke: #ffffff;
+.d3-node.is-hot:not(.is-selected) circle:not(.d3-node-halo) {
+  stroke: #f59e0b;
   stroke-width: 3.6;
   filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.55));
 }
 
-.d3-node.is-fixed circle {
+.d3-node.is-selected .d3-node-halo {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.d3-node.is-selected circle:not(.d3-node-halo) {
+  stroke: #597ef7;
+  stroke-width: 4.4;
+  filter: drop-shadow(0 0 20px rgba(89, 126, 247, 0.68));
+}
+
+.d3-node.is-selected-related circle:not(.d3-node-halo) {
+  stroke: rgba(89, 126, 247, 0.9);
+  stroke-width: 3;
+}
+
+.d3-node.is-fixed:not(.is-selected) circle:not(.d3-node-halo) {
   stroke: #ffffff;
 }
 
 .d3-node.is-dim {
   opacity: 0.16 !important;
+}
+
+.d3-node.is-selected-dim {
+  opacity: 0.2;
 }
 
 .d3-node.is-legend-dim {
