@@ -744,13 +744,81 @@
         "code": "05H1",
         "name": "商业服务业设施用地",
         "levelName": "二级类",
-        "target": "0702城镇社区服务设施用地 / 0704农村社区服务设施用地 / 090101零售商业用地 / 090102批发市场用地 / 090103餐饮用地 / 090104旅馆用地 / 090105公用设施营业网点用地 / 0902商务金融用地 / 0903娱乐用地 / 0904其他商业服务业用地"
+        "target": "0702城镇社区服务设施用地 / 0704农村社区服务设施用地 / 090101零售商业用地 / 090102批发市场用地 / 090103餐饮用地 / 090104旅馆用地 / 090105公用设施营业网点用地 / 0902商务金融用地 / 0903娱乐用地 / 0904其他商业服务业用地",
+        "children": [
+          {
+            "code": "090101",
+            "name": "零售商业用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "090102",
+            "name": "批发市场用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "090103",
+            "name": "餐饮用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "090104",
+            "name": "旅馆用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "090105",
+            "name": "公用设施营业网点用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "0508",
         "name": "物流仓储用地",
         "levelName": "二级类",
-        "target": "110101一类物流仓储用地 / 110102二类物流仓储用地 / 110103三类物流仓储用地 / 1102储备库用地"
+        "target": "110101一类物流仓储用地 / 110102二类物流仓储用地 / 110103三类物流仓储用地 / 1102储备库用地",
+        "children": [
+          {
+            "code": "110101",
+            "name": "一类物流仓储用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "110102",
+            "name": "二类物流仓储用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "110103",
+            "name": "三类物流仓储用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       }
     ],
     "S06": [
@@ -758,7 +826,33 @@
         "code": "0601",
         "name": "工业用地",
         "levelName": "二级类",
-        "target": "100101一类工业用地 / 100102二类工业用地 / 100103三类工业用地（1001工业用地）"
+        "target": "100101一类工业用地 / 100102二类工业用地 / 100103三类工业用地（1001工业用地）",
+        "children": [
+          {
+            "code": "100101",
+            "name": "一类工业用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "100102",
+            "name": "二类工业用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "100103",
+            "name": "三类工业用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "0602",
@@ -778,13 +872,57 @@
         "code": "0701",
         "name": "城镇住宅用地",
         "levelName": "二级类",
-        "target": "070101一类城镇住宅用地 / 070102二类城镇住宅用地 / 070103三类城镇住宅用地（0701城镇住宅用地）"
+        "target": "070101一类城镇住宅用地 / 070102二类城镇住宅用地 / 070103三类城镇住宅用地（0701城镇住宅用地）",
+        "children": [
+          {
+            "code": "070101",
+            "name": "一类城镇住宅用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "070102",
+            "name": "二类城镇住宅用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "070103",
+            "name": "三类城镇住宅用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "0702",
         "name": "农村宅基地",
         "levelName": "二级类",
-        "target": "070301一类农村宅基地 / 070302二类农村宅基地（0703农村宅基地）"
+        "target": "070301一类农村宅基地 / 070302二类农村宅基地（0703农村宅基地）",
+        "children": [
+          {
+            "code": "070301",
+            "name": "一类农村宅基地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "070302",
+            "name": "二类农村宅基地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       }
     ],
     "S08": [
@@ -850,13 +988,57 @@
         "code": "1005",
         "name": "交通服务场站用地",
         "levelName": "二级类",
-        "target": "120801对外交通场站用地 / 120802公共交通场站用地 / 120803社会停车场用地 / 1209其他交通设施用地"
+        "target": "120801对外交通场站用地 / 120802公共交通场站用地 / 120803社会停车场用地 / 1209其他交通设施用地",
+        "children": [
+          {
+            "code": "120801",
+            "name": "对外交通场站用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "120802",
+            "name": "公共交通场站用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "120803",
+            "name": "社会停车场用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "1006",
         "name": "农村道路",
         "levelName": "二级类",
-        "target": "060101村道用地 / 060102田间道（06农业设施建设用地）"
+        "target": "060101村道用地 / 060102田间道（06农业设施建设用地）",
+        "children": [
+          {
+            "code": "060101",
+            "name": "村道用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "060102",
+            "name": "田间道",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "1007",
@@ -868,7 +1050,17 @@
         "code": "1008",
         "name": "港口码头用地",
         "levelName": "二级类",
-        "target": "1204港口码头用地 / 120801对外交通场站用地"
+        "target": "1204港口码头用地 / 120801对外交通场站用地",
+        "children": [
+          {
+            "code": "120801",
+            "name": "对外交通场站用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "1009",
@@ -932,7 +1124,33 @@
         "code": "1202",
         "name": "设施农用地",
         "levelName": "二级类",
-        "target": "060201种植设施建设用地 / 060202畜禽养殖设施建设用地 / 060203水产养殖设施建设用地"
+        "target": "060201种植设施建设用地 / 060202畜禽养殖设施建设用地 / 060203水产养殖设施建设用地",
+        "children": [
+          {
+            "code": "060201",
+            "name": "种植设施建设用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "060202",
+            "name": "畜禽养殖设施建设用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          },
+          {
+            "code": "060203",
+            "name": "水产养殖设施建设用地",
+            "levelName": "三级类",
+            "target": "",
+            "type": "planning-detail",
+            "relationLabel": "对应"
+          }
+        ]
       },
       {
         "code": "1203",

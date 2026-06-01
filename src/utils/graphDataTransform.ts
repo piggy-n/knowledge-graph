@@ -25,6 +25,9 @@ export interface RawKnowledgeChild {
   name: string;
   target?: string;
   levelName?: string;
+  type?: KnowledgeNodeType;
+  relationLabel?: string;
+  children?: RawKnowledgeChild[];
 }
 
 export interface RawKnowledgeGraph {
@@ -140,23 +143,23 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
     }
   });
 
-  Object.entries(raw.children || {}).forEach(([parentId, children]) => {
+  function appendRawChildren(parentId: string, children: RawKnowledgeChild[]) {
     const parent = nodeMap.get(parentId);
     if (!parent) return;
 
     children.forEach((child, index) => {
       const childId = `${parentId}-${child.code}-${index}`;
-      const childType: KnowledgeNodeType =
-        parent.type === 'planning-category' || parent.id === 'planning' ? 'planning-detail' : 'survey-detail';
+      const childType = child.type || inferChildType(parent);
+      const childLevel = parent.level + 1;
 
       nodeMap.set(childId, {
         id: childId,
         label: `${child.code} ${child.name}`,
         type: childType,
-        level: parent.level + 1,
+        level: childLevel,
         code: child.code,
         name: child.name,
-        levelName: child.levelName || inferLevelName(parent.level + 1),
+        levelName: child.levelName || inferLevelName(childLevel),
         displayName: child.name,
         displayLines: buildNodeLines(child.name),
         parentId,
@@ -166,7 +169,7 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
         childrenCount: 0,
         x: parent.x,
         y: parent.y,
-        size: TYPE_SIZES[childType],
+        size: childLevel >= 4 ? 46 : TYPE_SIZES[childType],
         color: TYPE_COLORS[childType],
       });
       appendChild(childrenMap, parentId, childId);
@@ -175,10 +178,15 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
         id: `${parentId}->${childId}:detail`,
         source: parentId,
         target: childId,
-        label: child.target ? '对应' : '明细',
+        label: child.relationLabel || (child.target ? '对应' : '包含'),
         relationType: 'hierarchy',
       });
+      if (child.children?.length) appendRawChildren(childId, child.children);
     });
+  }
+
+  Object.entries(raw.children || {}).forEach(([parentId, children]) => {
+    appendRawChildren(parentId, children);
   });
 
   nodeMap.forEach((node, id) => {
@@ -258,6 +266,13 @@ function inferLevelName(level: number): string {
     4: '三级类',
   };
   return names[level] || `${level}级类`;
+}
+
+function inferChildType(parent: KnowledgeNode): KnowledgeNodeType {
+  if (parent.type === 'planning-category' || parent.type === 'planning-detail' || parent.id === 'planning') {
+    return 'planning-detail';
+  }
+  return 'survey-detail';
 }
 
 function appendChild(childrenMap: Map<string, string[]>, parentId: string, childId: string) {

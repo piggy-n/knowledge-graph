@@ -7,13 +7,44 @@ SOURCE = ROOT / "src" / "data" / "landSeaKnowledgeGraph.json"
 TARGET = ROOT / "src" / "data" / "landSeaKnowledgeGraph2.json"
 
 
-def child(code, name, target, level_name="二级类"):
-    return {
+def child(code, name, target="", level_name="二级类", node_type=None, relation_label=None, children=None):
+    item = {
         "code": code,
         "name": name,
         "levelName": level_name,
         "target": target,
     }
+    if node_type:
+        item["type"] = node_type
+    if relation_label:
+        item["relationLabel"] = relation_label
+    if children:
+        item["children"] = children
+    return item
+
+
+def tertiary_children(target):
+    children = []
+    seen = set()
+    for part in target.split("/"):
+        text = part.strip().split("（", 1)[0].strip()
+        if len(text) < 7:
+            continue
+        code = text[:6]
+        name = text[6:].strip()
+        if not code.isdigit() or not name or code in seen:
+            continue
+        seen.add(code)
+        children.append(
+            child(
+                code,
+                name,
+                level_name="三级类",
+                node_type="planning-detail",
+                relation_label="对应",
+            )
+        )
+    return children
 
 
 data = json.loads(SOURCE.read_text(encoding="utf-8"))
@@ -128,6 +159,12 @@ data["children"] = {
         ),
     ],
 }
+
+for items in data["children"].values():
+    for item in items:
+        details = tertiary_children(item.get("target", ""))
+        if details:
+            item["children"] = details
 
 TARGET.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 print(f"generated {TARGET}")
