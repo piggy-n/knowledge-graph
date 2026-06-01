@@ -11,7 +11,11 @@ export interface RawKnowledgeNode {
   label: string;
   type: KnowledgeNodeType;
   level: number;
+  code?: string;
+  name?: string;
   levelName?: string;
+  mapping?: string;
+  remarks?: string;
 }
 
 export interface RawKnowledgeEdge {
@@ -90,8 +94,8 @@ const TYPE_COLORS: Record<KnowledgeNodeType, string> = {
   system: '#8b5cf6',
   'survey-category': '#fb7185',
   'planning-category': '#2dd4bf',
-  'survey-detail': '#fbbf24',
-  'planning-detail': '#60a5fa',
+  'survey-detail': '#f59e0b',
+  'planning-detail': '#2563eb',
 };
 
 const TYPE_SIZES: Record<KnowledgeNodeType, number> = {
@@ -103,7 +107,7 @@ const TYPE_SIZES: Record<KnowledgeNodeType, number> = {
   'planning-detail': 56,
 };
 
-const HIERARCHY_LABELS = new Set(['左侧分类体系', '右侧分类体系', '包含']);
+const HIERARCHY_LABELS = new Set(['左侧分类体系', '右侧分类体系', '分类体系', '包含']);
 
 export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphDataset {
   const nodeMap = new Map<string, KnowledgeNode>();
@@ -112,20 +116,21 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
   const edges: KnowledgeEdge[] = [];
 
   raw.nodes.forEach((node) => {
-    const codeMatch = node.label.match(/^([A-Z]?\d{2,4})\s+(.+)$/);
-    const displayName = cleanBusinessName(codeMatch?.[2] || node.label, node.id);
+    const codeMatch = node.label.match(/^(\d{2}H\d|[A-Z]?\d{2,6})\s+(.+)$/);
+    const nodeName = node.name || codeMatch?.[2] || node.label;
+    const displayName = cleanBusinessName(nodeName, node.id);
     nodeMap.set(node.id, {
       ...node,
-      code: codeMatch?.[1],
-      name: codeMatch?.[2] || node.label,
+      code: node.code || codeMatch?.[1],
+      name: nodeName,
       levelName: node.levelName || inferLevelName(node.level),
       displayName,
       displayLines: buildNodeLines(displayName),
       childrenCount: 0,
       x: 0,
       y: 0,
-      size: TYPE_SIZES[node.type] || 34,
-      color: TYPE_COLORS[node.type] || '#64748b',
+      size: node.level >= 4 ? 46 : TYPE_SIZES[node.type] || 34,
+      color: resolveNodeColor(node.type, node.level, node.levelName),
     });
   });
 
@@ -170,7 +175,7 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
         x: parent.x,
         y: parent.y,
         size: childLevel >= 4 ? 46 : TYPE_SIZES[childType],
-        color: TYPE_COLORS[childType],
+        color: resolveNodeColor(childType, childLevel, child.levelName),
       });
       appendChild(childrenMap, parentId, childId);
       parentMap.set(childId, parentId);
@@ -227,6 +232,14 @@ export function nodeTypeText(type: KnowledgeNodeType): string {
     'planning-detail': '国土空间明细分类',
   };
   return map[type] || type;
+}
+
+function resolveNodeColor(type: KnowledgeNodeType, level: number, levelName?: string): string {
+  if (levelName === '三级类' || level >= 4) return '#14b8a6';
+  if (levelName === '二级类' || level === 3) {
+    return type === 'survey-detail' ? '#f59e0b' : '#2563eb';
+  }
+  return TYPE_COLORS[type] || '#64748b';
 }
 
 export function shortLabel(label: string, max = 12): string {

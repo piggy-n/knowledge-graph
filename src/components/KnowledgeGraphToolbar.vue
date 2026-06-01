@@ -5,6 +5,7 @@ defineProps<{
   title: string;
   subtitle?: string;
   switchText: string;
+  relationLabelsVisible: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   collapseAll: [];
   switchVersion: [];
   relayout: [];
+  toggleRelationLabels: [];
 }>();
 
 const keyword = ref('');
@@ -43,6 +45,9 @@ function handleSearch() {
       <button type="button" @click="emit('reset')">重置视图</button>
       <button type="button" @click="emit('expandAll')">全部展开</button>
       <button type="button" @click="emit('collapseAll')">全部收起</button>
+      <button type="button" @click="emit('toggleRelationLabels')">
+        {{ relationLabelsVisible ? '隐藏关系文字' : '显示关系文字' }}
+      </button>
       <button type="button" class="kg-toolbar__ghost" @click="emit('relayout')">重算布局</button>
       <button type="button" class="kg-toolbar__primary" @click="emit('switchVersion')">
         {{ switchText }}

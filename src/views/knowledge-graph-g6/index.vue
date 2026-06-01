@@ -5,7 +5,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import KnowledgeGraphDetailPanel from '../../components/KnowledgeGraphDetailPanel.vue';
 import KnowledgeGraphToolbar from '../../components/KnowledgeGraphToolbar.vue';
-import rawGraphData from '../../data/landSeaKnowledgeGraph2.json';
+import rawGraphData from '../../data/landSeaKnowledgeGraph3.json';
 import { transformKnowledgeGraph, type KnowledgeEdge, type KnowledgeNode, type RawKnowledgeGraph } from '../../utils/graphDataTransform';
 import { GraphExpandManager } from '../../utils/graphExpandManager';
 
@@ -13,6 +13,7 @@ const router = useRouter();
 const containerRef = ref<HTMLDivElement | null>(null);
 const selectedNode = ref<KnowledgeNode>();
 const message = ref('');
+const relationLabelsVisible = ref(true);
 const tooltip = ref({
   visible: false,
   left: 0,
@@ -250,7 +251,7 @@ function toG6Data() {
 
 function toG6Edge(edge: KnowledgeEdge) {
   const mapping = edge.relationType === 'mapping';
-  const label = simplifyEdgeLabel(edge);
+  const label = relationLabelsVisible.value ? simplifyEdgeLabel(edge) : '';
   return {
     id: edge.id,
     source: edge.source,
@@ -342,6 +343,7 @@ function buildForceLayout(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
 
 function simplifyEdgeLabel(edge: KnowledgeEdge): string {
   if (edge.label === '对应分类') return '对应';
+  if (edge.label && edge.label !== '对应' && edge.label.includes('对应')) return '';
   if (edge.label === '包含' || edge.label === '左侧分类体系' || edge.label === '右侧分类体系') return '';
   return edge.label || '';
 }
@@ -498,6 +500,11 @@ function collapseAll() {
   resetView();
 }
 
+function toggleRelationLabels() {
+  relationLabelsVisible.value = !relationLabelsVisible.value;
+  renderGraph(selectedNode.value?.id);
+}
+
 function searchNode(keyword: string) {
   const target = manager.searchFirst(keyword);
   if (!target) {
@@ -528,6 +535,8 @@ function switchVersion() {
       @expand-all="expandAll"
       @collapse-all="collapseAll"
       @relayout="resetView"
+      :relation-labels-visible="relationLabelsVisible"
+      @toggle-relation-labels="toggleRelationLabels"
       @switch-version="switchVersion"
     />
     <main class="kg-shell">

@@ -623,6 +623,10 @@ button {
     font-size 0.2s ease;
 }
 
+.kg-stage.is-link-label-hidden .d3-link-label {
+  opacity: 0 !important;
+}
+
 .d3-link-label.is-default-visible {
   opacity: 0.92;
 }

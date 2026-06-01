@@ -4,12 +4,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import KnowledgeGraphDetailPanel from '../../components/KnowledgeGraphDetailPanel.vue';
 import KnowledgeGraphToolbar from '../../components/KnowledgeGraphToolbar.vue';
-import rawGraphData from '../../data/landSeaKnowledgeGraph2.json';
+import rawGraphData from '../../data/landSeaKnowledgeGraph3.json';
 import { formatNodeName, shortLabel, transformKnowledgeGraph, type KnowledgeEdge, type KnowledgeNode, type KnowledgeNodeType, type RawKnowledgeGraph } from '../../utils/graphDataTransform';
 import { GraphExpandManager } from '../../utils/graphExpandManager';
 
 type D3Node = KnowledgeNode & d3.SimulationNodeDatum & { fx?: number | null; fy?: number | null };
 type D3Link = KnowledgeEdge & d3.SimulationLinkDatum<D3Node>;
+type LegendItem = { id: string; type: KnowledgeNodeType; levelName?: string; label: string; color: string };
 
 const router = useRouter();
 const svgRef = ref<SVGSVGElement | null>(null);
@@ -22,11 +23,12 @@ const tooltip = ref({
   top: 0,
   rows: [] as Array<[string, string]>,
 });
-const activeLegendType = ref<KnowledgeNodeType | ''>('');
-const hoveredLegendType = ref<KnowledgeNodeType | ''>('');
+const activeLegendId = ref('');
+const hoveredLegendId = ref('');
 const overviewItems = ref<Array<[string, string]>>([]);
 const legendCollapsed = ref(false);
 const overviewCollapsed = ref(false);
+const relationLabelsVisible = ref(true);
 
 let manager: GraphExpandManager;
 let svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -39,17 +41,18 @@ let zoomBehavior: d3.ZoomBehavior<SVGSVGElement, unknown>;
 let resizeObserver: ResizeObserver | undefined;
 const positionCache = new Map<string, Pick<D3Node, 'x' | 'y' | 'fx' | 'fy'>>();
 
-const legendItems: Array<{ type: KnowledgeNodeType; label: string; color: string }> = [
-  { type: 'root', label: '中心主题', color: '#38bdf8' },
-  { type: 'system', label: '分类体系', color: '#8b5cf6' },
-  { type: 'survey-category', label: '国土调查一级类', color: '#fb7185' },
-  { type: 'planning-category', label: '用地用海一级类', color: '#2dd4bf' },
-  { type: 'survey-detail', label: '国土调查二级类', color: '#fbbf24' },
-  { type: 'planning-detail', label: '用地用海补充类', color: '#60a5fa' },
+const legendItems: LegendItem[] = [
+  { id: 'root', type: 'root', label: '中心主题', color: '#38bdf8' },
+  { id: 'system', type: 'system', label: '分类体系', color: '#8b5cf6' },
+  { id: 'survey-first', type: 'survey-category', levelName: '一级类', label: '国土调查一级类', color: '#fb7185' },
+  { id: 'survey-second', type: 'survey-detail', levelName: '二级类', label: '国土调查二级类', color: '#f59e0b' },
+  { id: 'planning-first', type: 'planning-category', levelName: '一级类', label: '用地用海一级类', color: '#2dd4bf' },
+  { id: 'planning-second', type: 'planning-detail', levelName: '二级类', label: '用地用海二级类', color: '#2563eb' },
+  { id: 'planning-third', type: 'planning-detail', levelName: '三级类', label: '用地用海三级类', color: '#14b8a6' },
 ];
 
 const activeLegendLabel = computed(() => {
-  return legendItems.find((item) => item.type === activeLegendType.value)?.label;
+  return legendItems.find((item) => item.id === activeLegendId.value)?.label;
 });
 
 try {
@@ -511,35 +514,45 @@ function buildTooltipRows(node: KnowledgeNode): Array<[string, string]> {
 
 function simplifyEdgeLabel(edge: KnowledgeEdge): string {
   if (edge.label === '对应分类') return '对应';
+  if (edge.label && edge.label !== '对应' && edge.label.includes('对应')) return '';
   if (edge.label === '左侧分类体系' || edge.label === '右侧分类体系') return '分类体系';
   if (edge.label === '包含') return '包含';
   return edge.label || '';
 }
 
 function isDefaultVisibleLabel(edge: KnowledgeEdge): boolean {
-  return edge.relationType === 'hierarchy' || isDashedRelation(edge);
+  return Boolean(simplifyEdgeLabel(edge) && (edge.relationType === 'hierarchy' || isDashedRelation(edge)));
 }
 
 function isDashedRelation(edge: KnowledgeEdge): boolean {
   return edge.relationType === 'mapping';
 }
 
-function setLegendHover(type: KnowledgeNodeType | '') {
-  hoveredLegendType.value = type;
+function setLegendHover(id: string) {
+  hoveredLegendId.value = id;
   applyLegendState();
 }
 
-function toggleLegend(type: KnowledgeNodeType) {
-  activeLegendType.value = activeLegendType.value === type ? '' : type;
+function toggleLegend(id: string) {
+  activeLegendId.value = activeLegendId.value === id ? '' : id;
   applyLegendState();
 }
 
 function applyLegendState() {
   if (!nodeLayer) return;
-  const type = activeLegendType.value || hoveredLegendType.value;
+  const legend = legendItems.find((item) => item.id === (activeLegendId.value || hoveredLegendId.value));
   nodeLayer
     .selectAll<SVGGElement, D3Node>('g')
-    .classed('is-legend-dim', (node) => Boolean(type && node.type !== type));
+    .classed('is-legend-dim', (node) => Boolean(legend && !matchesLegend(node, legend)));
+}
+
+function matchesLegend(node: D3Node, legend: LegendItem): boolean {
+  if (node.type !== legend.type) return false;
+  return !legend.levelName || node.levelName === legend.levelName;
+}
+
+function toggleRelationLabels() {
+  relationLabelsVisible.value = !relationLabelsVisible.value;
 }
 
 function updateOverview(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
@@ -648,10 +661,12 @@ function targetId(link: D3Link): string {
       @expand-all="expandAll"
       @collapse-all="collapseAll"
       @relayout="relayout"
+      :relation-labels-visible="relationLabelsVisible"
+      @toggle-relation-labels="toggleRelationLabels"
       @switch-version="switchVersion"
     />
     <main class="kg-shell">
-      <div ref="stageRef" class="kg-stage kg-stage--light">
+      <div ref="stageRef" class="kg-stage kg-stage--light" :class="{ 'is-link-label-hidden': !relationLabelsVisible }">
         <div v-if="message" class="kg-message kg-message--light">{{ message }}</div>
         <svg ref="svgRef" class="kg-d3-svg" role="img" aria-label="D3 用地用海分类知识图谱"></svg>
         <div class="kg-legend kg-floating-panel" :class="{ 'is-collapsed': legendCollapsed }">
@@ -662,13 +677,13 @@ function targetId(link: D3Link): string {
           <div class="kg-panel-body kg-legend__body">
             <button
               v-for="item in legendItems"
-              :key="item.type"
+              :key="item.id"
               type="button"
               class="kg-legend__item"
-              :class="{ 'is-active': activeLegendType === item.type }"
-              @mouseenter="setLegendHover(item.type)"
+              :class="{ 'is-active': activeLegendId === item.id }"
+              @mouseenter="setLegendHover(item.id)"
               @mouseleave="setLegendHover('')"
-              @click="toggleLegend(item.type)"
+              @click="toggleLegend(item.id)"
             >
               <span class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
               <span>{{ item.label }}</span>
