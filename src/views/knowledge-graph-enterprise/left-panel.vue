@@ -34,7 +34,7 @@ const rows = computed(() => {
   <aside class="kg-enterprise-left">
     <section class="kg-detail kg-enterprise-panel">
       <div class="kg-detail__header">
-        <span>节点详情</span>
+        <span class="kg-enterprise-card-title">节点详情</span>
         <strong>{{ node ? formatNodeName(node) : '未选择节点' }}</strong>
       </div>
       <div v-if="node" class="kg-detail__body">
@@ -60,7 +60,7 @@ const rows = computed(() => {
 
     <section class="kg-overview kg-floating-panel kg-enterprise-panel">
       <div class="kg-panel-header kg-enterprise-panel-header">
-        <span class="kg-floating-title">数据概览</span>
+        <span class="kg-floating-title kg-enterprise-card-title">数据概览</span>
       </div>
       <div class="kg-panel-body">
         <dl v-for="[label, value] in overviewItems" :key="label">
@@ -72,7 +72,7 @@ const rows = computed(() => {
 
     <section class="kg-legend kg-floating-panel kg-enterprise-panel">
       <div class="kg-panel-header kg-enterprise-panel-header">
-        <span class="kg-floating-title">图例</span>
+        <span class="kg-floating-title kg-enterprise-card-title">图例说明</span>
       </div>
       <div class="kg-panel-body kg-legend__body">
         <div class="kg-legend__section">
@@ -107,4 +107,3 @@ const rows = computed(() => {
     </section>
   </aside>
 </template>
-

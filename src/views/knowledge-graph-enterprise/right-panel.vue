@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
-import { ElButton, ElInput } from 'element-plus';
-import { Connection, Fold, Hide, Refresh, Search, View } from '@element-plus/icons-vue';
+import { ElButton, ElInput, ElTag } from 'element-plus';
+import { Back, Connection, Fold, Hide, Refresh, Search, View } from '@element-plus/icons-vue';
 import { formatNodeName } from './graph-data';
 
 const props = defineProps({
@@ -15,6 +15,7 @@ const props = defineProps({
 
 const emit = defineEmits(['search', 'expand-all', 'collapse-all', 'toggle-relation-labels', 'relayout', 'select-result', 'restore-full-graph']);
 const keyword = ref(props.searchKeyword);
+const quickKeywords = ['用地', '耕地', '湿地', '交通', '水域'];
 
 watch(
   () => props.searchKeyword,
@@ -26,61 +27,73 @@ watch(
 function handleSearch() {
   emit('search', keyword.value);
 }
+
+function handleQuickSearch(value) {
+  keyword.value = value;
+  emit('search', value);
+}
 </script>
 
 <template>
   <main class="kg-enterprise-right">
     <header class="kg-toolbar kg-enterprise-toolbar">
-      <div class="kg-toolbar__title">
-        <strong>G6 知识图谱</strong>
-        <span>企业级用地用海分类关系展示</span>
+      <div class="kg-enterprise-search-area">
+        <div class="kg-enterprise-search-row">
+          <ElInput
+            v-model="keyword"
+            class="kg-enterprise-search"
+            clearable
+            placeholder="请输入分类名称、编码或对应关系"
+            :prefix-icon="Search"
+            @keyup.enter="handleSearch"
+          />
+          <ElButton type="primary" :icon="Search" @click="handleSearch">搜索</ElButton>
+        </div>
+        <div class="kg-enterprise-quick-tags">
+          <ElTag
+            v-for="item in quickKeywords"
+            :key="item"
+            class="kg-enterprise-quick-tag"
+            size="small"
+            effect="plain"
+            @click="handleQuickSearch(item)"
+          >
+            {{ item }}
+          </ElTag>
+        </div>
       </div>
       <div class="kg-toolbar__actions">
-        <ElInput
-          v-model="keyword"
-          class="kg-enterprise-search"
-          clearable
-          placeholder="请输入分类名称、编码或对应关系"
-          :prefix-icon="Search"
-          @keyup.enter="handleSearch"
-        />
-        <ElButton type="primary" :icon="Search" @click="handleSearch">搜索</ElButton>
         <ElButton :icon="Connection" @click="emit('expand-all')">全部展开</ElButton>
         <ElButton :icon="Fold" @click="emit('collapse-all')">全部收起</ElButton>
         <ElButton :icon="relationLabelsVisible ? Hide : View" @click="emit('toggle-relation-labels')">
           {{ relationLabelsVisible ? '隐藏关系文字' : '显示关系文字' }}
         </ElButton>
         <ElButton :icon="Refresh" class="kg-toolbar__ghost" @click="emit('relayout')">重算布局</ElButton>
+        <ElButton :icon="Back" @click="emit('restore-full-graph')">返回全部图谱</ElButton>
       </div>
     </header>
 
     <section class="kg-stage kg-stage--light kg-enterprise-stage">
       <div v-if="message" class="kg-message">{{ message }}</div>
-      <button v-if="searchFocusActive" type="button" class="kg-focus-exit" @click="emit('restore-full-graph')">
-        返回全部图谱
-      </button>
-      <slot name="canvas"></slot>
-    </section>
-
-    <section class="kg-search-results kg-enterprise-results" :class="{ 'is-empty': !searchResults.length }">
-      <div class="kg-search-results__header">
-        <strong>搜索结果</strong>
-        <span>{{ searchKeyword ? `${searchKeyword} · ${searchResults.length} 个` : '请输入关键词检索节点' }}</span>
+      <div v-if="searchResults.length" class="kg-search-results kg-enterprise-results">
+        <div class="kg-search-results__header">
+          <strong>搜索结果</strong>
+          <span>{{ searchKeyword }} · {{ searchResults.length }} 个</span>
+        </div>
+        <div class="kg-enterprise-results-list">
+          <button
+            v-for="node in searchResults"
+            :key="node.id"
+            type="button"
+            class="kg-search-results__item"
+            @click="emit('select-result', node)"
+          >
+            <span>{{ formatNodeName(node) }}</span>
+            <em>{{ searchResultPath(node) }}</em>
+          </button>
+        </div>
       </div>
-      <template v-if="searchResults.length">
-        <button
-          v-for="node in searchResults"
-          :key="node.id"
-          type="button"
-          class="kg-search-results__item"
-          @click="emit('select-result', node)"
-        >
-          <span>{{ formatNodeName(node) }}</span>
-          <em>{{ searchResultPath(node) }}</em>
-        </button>
-      </template>
-      <div v-else class="kg-enterprise-results-empty">暂无搜索结果</div>
+      <slot name="canvas"></slot>
     </section>
   </main>
 </template>
-
