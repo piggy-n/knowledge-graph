@@ -3,6 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import App from './App.vue';
 import G6KnowledgeGraph from './views/knowledge-graph-g6/index.vue';
 import D3KnowledgeGraph from './views/knowledge-graph-d3/index.vue';
+import EnterpriseKnowledgeGraph from './views/knowledge-graph-enterprise/index.vue';
 import './styles.css';
 
 const routes = [
@@ -21,6 +22,12 @@ const routes = [
     name: 'KnowledgeGraphD3',
     component: D3KnowledgeGraph,
     meta: { title: 'D3 知识图谱' },
+  },
+  {
+    path: '/knowledge-graph-enterprise',
+    name: 'KnowledgeGraphEnterprise',
+    component: EnterpriseKnowledgeGraph,
+    meta: { title: '企业版 G6 知识图谱' },
   },
 ];
 
