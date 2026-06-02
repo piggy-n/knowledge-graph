@@ -19,8 +19,6 @@ const searchKeyword = ref('');
 const searchFocusActive = ref(false);
 const locatedNodeId = ref('');
 const overviewItems = ref([]);
-const legendCollapsed = ref(false);
-const overviewCollapsed = ref(false);
 const activeLegendId = ref('');
 const hoveredLegendId = ref('');
 let graph;
@@ -186,7 +184,7 @@ function mountGraphWhenReady(retryCount = 0) {
   }
 }
 
-function renderGraph(focusId) {
+function renderGraph() {
   if (!graph || !containerRef.value) return;
   const visibleData = manager.getVisibleGraph();
   updateOverview(visibleData.nodes, visibleData.edges);
