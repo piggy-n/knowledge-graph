@@ -10,10 +10,12 @@ export interface RawKnowledgeNode {
   id: string;
   label: string;
   type: KnowledgeNodeType;
-  level: number;
+  level: number | null;
   code?: string;
   name?: string;
   levelName?: string;
+  system?: string;
+  parentId?: string | null;
   mapping?: string;
   remarks?: string;
 }
@@ -22,6 +24,8 @@ export interface RawKnowledgeEdge {
   source: string;
   target: string;
   label?: string;
+  type?: 'contains' | 'mapping';
+  lineType?: 'solid' | 'dashed';
 }
 
 export interface RawKnowledgeChild {
@@ -47,7 +51,7 @@ export interface KnowledgeNode {
   id: string;
   label: string;
   type: KnowledgeNodeType;
-  level: number;
+  level: number | null;
   code?: string;
   name?: string;
   parentId?: string;
@@ -71,6 +75,8 @@ export interface KnowledgeEdge {
   target: string;
   label?: string;
   relationType: 'hierarchy' | 'mapping';
+  type?: 'contains' | 'mapping';
+  lineType?: 'solid' | 'dashed';
 }
 
 export interface KnowledgeGraphDataset {
@@ -123,19 +129,20 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
       ...node,
       code: node.code || codeMatch?.[1],
       name: nodeName,
+      parentId: node.parentId || undefined,
       levelName: node.levelName || inferLevelName(node.level),
       displayName,
       displayLines: buildNodeLines(displayName),
       childrenCount: 0,
       x: 0,
       y: 0,
-      size: node.level >= 4 ? 46 : TYPE_SIZES[node.type] || 34,
+      size: (node.level || 0) >= 3 ? 46 : TYPE_SIZES[node.type] || 34,
       color: resolveNodeColor(node.type, node.level, node.levelName),
     });
   });
 
   raw.edges.forEach((edge, index) => {
-    const isHierarchy = HIERARCHY_LABELS.has(edge.label || '');
+    const isHierarchy = edge.type === 'contains' || (!edge.type && HIERARCHY_LABELS.has(edge.label || ''));
     edges.push({
       ...edge,
       id: `${edge.source}->${edge.target}:${index}`,
@@ -155,7 +162,7 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
     children.forEach((child, index) => {
       const childId = `${parentId}-${child.code}-${index}`;
       const childType = child.type || inferChildType(parent);
-      const childLevel = parent.level + 1;
+      const childLevel = (parent.level || 0) + 1;
 
       nodeMap.set(childId, {
         id: childId,
@@ -234,9 +241,10 @@ export function nodeTypeText(type: KnowledgeNodeType): string {
   return map[type] || type;
 }
 
-function resolveNodeColor(type: KnowledgeNodeType, level: number, levelName?: string): string {
-  if (levelName === '三级类' || level >= 4) return '#ef4444';
-  if (levelName === '二级类' || level === 3) {
+function resolveNodeColor(type: KnowledgeNodeType, level: number | null, levelName?: string): string {
+  const normalizedLevel = level || 0;
+  if (levelName === '三级类' || normalizedLevel >= 3) return '#ef4444';
+  if (levelName === '二级类' || normalizedLevel === 2) {
     return type === 'survey-detail' ? '#f59e0b' : '#a855f7';
   }
   return TYPE_COLORS[type] || '#64748b';
@@ -270,13 +278,13 @@ function cleanBusinessName(name: string, id: string): string {
   return name.replace(/^([A-Z]?\d{2,4})\s*/, '');
 }
 
-function inferLevelName(level: number): string {
+function inferLevelName(level: number | null): string {
+  if (level === null) return '分类体系';
   const names: Record<number, string> = {
     0: '中心主题',
-    1: '分类体系',
-    2: '一级类',
-    3: '二级类',
-    4: '三级类',
+    1: '一级类',
+    2: '二级类',
+    3: '三级类',
   };
   return names[level] || `${level}级类`;
 }
@@ -324,7 +332,7 @@ function assignPositions(nodeMap: Map<string, KnowledgeNode>, childrenMap: Map<s
 
   nodeMap.forEach((node) => {
     const children = childrenMap.get(node.id) || [];
-    if (!children.length || node.level < 2) return;
+    if (!children.length || (node.level || 0) < 1) return;
 
     const parent = nodeMap.get(node.id);
     if (!parent) return;

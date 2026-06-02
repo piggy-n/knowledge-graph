@@ -4,7 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import KnowledgeGraphDetailPanel from '../../components/KnowledgeGraphDetailPanel.vue';
 import KnowledgeGraphToolbar from '../../components/KnowledgeGraphToolbar.vue';
-import rawGraphData from '../../data/landSeaKnowledgeGraph3.json';
+import rawGraphData from '../../data/data.json';
 import { formatNodeName, shortLabel, transformKnowledgeGraph, type KnowledgeEdge, type KnowledgeNode, type KnowledgeNodeType, type RawKnowledgeGraph } from '../../utils/graphDataTransform';
 import { GraphExpandManager } from '../../utils/graphExpandManager';
 
@@ -345,18 +345,19 @@ function createDragBehavior() {
 
 function applyHover(id: string) {
   const related = manager.getConnectedIds(id);
+  const relatedEdges = manager.getContextEdgeIds(id);
   nodeLayer
     .selectAll<SVGGElement, D3Node>('g')
     .classed('is-hot', (node) => node.id === id)
     .classed('is-dim', (node) => !related.has(node.id));
   linkLayer
     .selectAll<SVGLineElement, D3Link>('line')
-    .classed('is-hot', (link) => sourceId(link) === id || targetId(link) === id)
-    .classed('is-dim', (link) => sourceId(link) !== id && targetId(link) !== id);
+    .classed('is-hot', (link) => relatedEdges.has(link.id))
+    .classed('is-dim', (link) => !relatedEdges.has(link.id));
   linkLabelLayer
     .selectAll<SVGTextElement, D3Link>('text')
-    .classed('is-hot', (link) => sourceId(link) === id || targetId(link) === id)
-    .classed('is-dim', (link) => sourceId(link) !== id && targetId(link) !== id);
+    .classed('is-hot', (link) => relatedEdges.has(link.id))
+    .classed('is-dim', (link) => !relatedEdges.has(link.id));
 }
 
 function applyEdgeHover(edgeId: string) {
@@ -389,6 +390,7 @@ function applySelectedState() {
   if (!nodeLayer || !linkLayer || !linkLabelLayer) return;
   const id = selectedNode.value?.id;
   const related = id ? manager.getConnectedIds(id) : new Set<string>();
+  const relatedEdges = id ? manager.getContextEdgeIds(id) : new Set<string>();
   nodeLayer
     .selectAll<SVGGElement, D3Node>('g')
     .classed('is-selected', (node) => node.id === id)
@@ -396,12 +398,12 @@ function applySelectedState() {
     .classed('is-selected-dim', (node) => Boolean(id && !related.has(node.id)));
   linkLayer
     .selectAll<SVGLineElement, D3Link>('line')
-    .classed('is-selected-link', (link) => Boolean(id && (sourceId(link) === id || targetId(link) === id)))
-    .classed('is-selected-dim', (link) => Boolean(id && sourceId(link) !== id && targetId(link) !== id));
+    .classed('is-selected-link', (link) => Boolean(id && relatedEdges.has(link.id)))
+    .classed('is-selected-dim', (link) => Boolean(id && !relatedEdges.has(link.id)));
   linkLabelLayer
     .selectAll<SVGTextElement, D3Link>('text')
-    .classed('is-selected-link', (link) => Boolean(id && (sourceId(link) === id || targetId(link) === id)))
-    .classed('is-selected-dim', (link) => Boolean(id && sourceId(link) !== id && targetId(link) !== id));
+    .classed('is-selected-link', (link) => Boolean(id && relatedEdges.has(link.id)))
+    .classed('is-selected-dim', (link) => Boolean(id && !relatedEdges.has(link.id)));
 }
 
 function clearSelectedNode() {

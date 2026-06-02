@@ -42,13 +42,30 @@ export class GraphExpandManager {
   }
 
   getConnectedIds(id: string): Set<string> {
-    const related = new Set<string>([id]);
+    return this.getContextIds(id);
+  }
+
+  getContextIds(id: string): Set<string> {
+    const related = new Set<string>();
+    this.addNodeContext(id, related);
+
     this.dataset.edges.forEach((edge) => {
-      if (!this.visibleIds.has(edge.source) || !this.visibleIds.has(edge.target)) return;
-      if (edge.source === id) related.add(edge.target);
-      if (edge.target === id) related.add(edge.source);
+      if (edge.relationType !== 'mapping') return;
+      const mappingTarget = edge.source === id ? edge.target : edge.target === id ? edge.source : '';
+      if (!mappingTarget) return;
+      this.addNodeContext(mappingTarget, related);
     });
+
     return related;
+  }
+
+  getContextEdgeIds(id: string): Set<string> {
+    const contextIds = this.getContextIds(id);
+    const edgeIds = new Set<string>();
+    this.dataset.edges.forEach((edge) => {
+      if (contextIds.has(edge.source) && contextIds.has(edge.target)) edgeIds.add(edge.id);
+    });
+    return edgeIds;
   }
 
   hasChildren(id: string): boolean {
@@ -132,5 +149,23 @@ export class GraphExpandManager {
       currentId = parentId;
     }
     return path;
+  }
+
+  private addNodeContext(id: string, related: Set<string>) {
+    this.getPathToRoot(id).forEach((nodeId) => related.add(nodeId));
+    const children = this.dataset.childrenMap.get(id) || [];
+    children.forEach((childId) => {
+      related.add(childId);
+      const child = this.dataset.nodeMap.get(childId);
+      const current = this.dataset.nodeMap.get(id);
+      // planning 一级类 hover 时补充二级类下的三级类，满足对应一级类的完整展示。
+      if (current?.system === 'planning' && current.levelName === '一级类') {
+        (this.dataset.childrenMap.get(childId) || []).forEach((grandChildId) => related.add(grandChildId));
+      }
+      if (child?.system === 'planning' && child.levelName === '一级类') {
+        (this.dataset.childrenMap.get(childId) || []).forEach((grandChildId) => related.add(grandChildId));
+      }
+    });
+    related.add(id);
   }
 }

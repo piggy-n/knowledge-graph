@@ -5,7 +5,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import KnowledgeGraphDetailPanel from '../../components/KnowledgeGraphDetailPanel.vue';
 import KnowledgeGraphToolbar from '../../components/KnowledgeGraphToolbar.vue';
-import rawGraphData from '../../data/landSeaKnowledgeGraph3.json';
+import rawGraphData from '../../data/data.json';
 import { formatNodeName, transformKnowledgeGraph, type KnowledgeEdge, type KnowledgeNode, type KnowledgeNodeType, type RawKnowledgeGraph } from '../../utils/graphDataTransform';
 import { GraphExpandManager } from '../../utils/graphExpandManager';
 
@@ -262,7 +262,7 @@ function toG6Data() {
           offset: 0,
           style: {
             fill: '#ffffff',
-            fontSize: isRoot ? 12 : node.level >= 3 ? 8 : 10,
+            fontSize: isRoot ? 12 : (node.level || 0) >= 3 ? 8 : 10,
             fontWeight: isRoot ? 700 : 600,
             lineHeight: isRoot ? 14 : 11,
             textAlign: 'center',
@@ -397,6 +397,7 @@ function setEdgeTextState(item: any, active: boolean) {
 
 function applyHover(id: string) {
   const relatedIds = manager.getConnectedIds(id);
+  const relatedEdgeIds = manager.getContextEdgeIds(id);
   graph.getNodes().forEach((item: any) => {
     const itemId = item.getModel().id;
     graph.setItemState(item, 'active', itemId === id);
@@ -404,7 +405,7 @@ function applyHover(id: string) {
   });
   graph.getEdges().forEach((item: any) => {
     const model = item.getModel();
-    const active = model.source === id || model.target === id;
+    const active = relatedEdgeIds.has(model.id);
     graph.setItemState(item, 'active', active);
     graph.setItemState(item, 'inactive', !active);
   });
@@ -426,6 +427,7 @@ function applySelectedState(focusId?: string) {
   if (!graph) return;
   const selectedId = focusId || selectedNode.value?.id;
   const relatedIds = selectedId ? manager.getConnectedIds(selectedId) : new Set<string>();
+  const relatedEdgeIds = selectedId ? manager.getContextEdgeIds(selectedId) : new Set<string>();
   graph.getNodes().forEach((item: any) => {
     const itemId = item.getModel().id;
     graph.setItemState(item, 'selected', itemId === selectedId);
@@ -433,7 +435,7 @@ function applySelectedState(focusId?: string) {
   });
   graph.getEdges().forEach((item: any) => {
     const model = item.getModel();
-    const selected = Boolean(selectedId && (model.source === selectedId || model.target === selectedId));
+    const selected = Boolean(selectedId && relatedEdgeIds.has(model.id));
     graph.setItemState(item, 'selected', selected);
     graph.setItemState(item, 'inactive', Boolean(selectedId && !selected));
     setSelectedEdgeTextState(item, selected);
