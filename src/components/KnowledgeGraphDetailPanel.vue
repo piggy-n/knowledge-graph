@@ -5,6 +5,7 @@ import { formatNodeName } from '../utils/graphDataTransform';
 
 const props = defineProps<{
   node?: KnowledgeNode;
+  children?: KnowledgeNode[];
 }>();
 
 const rows = computed(() => {
@@ -20,6 +21,8 @@ const rows = computed(() => {
     ['子节点数量', node.childrenCount ? String(node.childrenCount) : undefined],
   ].filter((row): row is [string, string] => Boolean(row[1]));
 });
+
+const childRows = computed(() => props.children || []);
 </script>
 
 <template>
@@ -33,6 +36,19 @@ const rows = computed(() => {
         <dt>{{ label }}</dt>
         <dd>{{ value }}</dd>
       </dl>
+      <section v-if="childRows.length" class="kg-detail-children">
+        <div class="kg-detail-children__header">
+          <span>子节点</span>
+          <strong>{{ childRows.length }}</strong>
+        </div>
+        <div class="kg-detail-children__list">
+          <article v-for="child in childRows" :key="child.id" class="kg-detail-children__item">
+            <span>{{ child.code || '-' }}</span>
+            <strong>{{ child.displayName || child.name || child.label }}</strong>
+            <em>{{ child.levelName || '-' }}</em>
+          </article>
+        </div>
+      </section>
     </div>
     <div v-else class="kg-detail__empty">暂无节点详情</div>
   </aside>

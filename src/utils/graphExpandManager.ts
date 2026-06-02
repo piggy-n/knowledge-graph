@@ -41,6 +41,12 @@ export class GraphExpandManager {
     return [...this.dataset.nodeMap.values()];
   }
 
+  getChildren(id: string): KnowledgeNode[] {
+    return (this.dataset.childrenMap.get(id) || [])
+      .map((childId) => this.getNode(childId))
+      .filter((node): node is KnowledgeNode => Boolean(node));
+  }
+
   getConnectedIds(id: string): Set<string> {
     return this.getContextIds(id);
   }

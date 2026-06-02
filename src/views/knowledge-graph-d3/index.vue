@@ -64,9 +64,12 @@ const legendItems: LegendItem[] = [
   { id: 'edge-hierarchy', label: '包含关系', color: '#2563eb', lineType: 'solid', lineWidth: 3 },
 ];
 
+const nodeLegendItems = computed(() => legendItems.filter((item) => item.type));
+const relationLegendItems = computed(() => legendItems.filter((item) => item.lineType));
 const activeLegendLabel = computed(() => {
   return legendItems.find((item) => item.id === activeLegendId.value)?.label;
 });
+const selectedChildren = computed(() => (selectedNode.value && manager ? manager.getChildren(selectedNode.value.id) : []));
 
 try {
   const dataset = transformKnowledgeGraph(rawGraphData as RawKnowledgeGraph);
@@ -292,6 +295,7 @@ function updateGraph() {
       focusNode(node.id);
     })
     .on('mouseenter', (_event, node) => {
+      selectedNode.value = manager.getNode(node.id);
       applyHover(node.id);
       showNodeTooltip(node);
     })
@@ -861,25 +865,38 @@ function searchResultSystem(node: KnowledgeNode): string {
             <span class="kg-panel-toggle">{{ legendCollapsed ? '展开' : '收起' }}</span>
           </button>
           <div class="kg-panel-body kg-legend__body">
-            <button
-              v-for="item in legendItems"
-              :key="item.id"
-              type="button"
-              class="kg-legend__item"
-              :class="{ 'is-active': activeLegendId === item.id, 'kg-legend__item--line': item.lineType }"
-              @mouseenter="setLegendHover(item.id)"
-              @mouseleave="setLegendHover('')"
-              @click="toggleLegend(item.id)"
-            >
-              <span
-                v-if="item.lineType"
-                class="kg-legend__line"
-                :class="{ 'kg-legend__line--dashed': item.lineType === 'dashed' }"
-                :style="{ borderColor: item.color, borderWidth: `${item.lineWidth || 2}px` }"
-              ></span>
-              <span v-else class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
-              <span>{{ item.label }}</span>
-            </button>
+            <div class="kg-legend__section">
+              <h3>节点类别</h3>
+              <button
+                v-for="item in nodeLegendItems"
+                :key="item.id"
+                type="button"
+                class="kg-legend__item"
+                :class="{ 'is-active': activeLegendId === item.id }"
+                @mouseenter="setLegendHover(item.id)"
+                @mouseleave="setLegendHover('')"
+                @click="toggleLegend(item.id)"
+              >
+                <span class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
+            <div class="kg-legend__section">
+              <h3>关系类型</h3>
+              <button
+                v-for="item in relationLegendItems"
+                :key="item.id"
+                type="button"
+                class="kg-legend__item kg-legend__item--line"
+              >
+                <span
+                  class="kg-legend__line"
+                  :class="{ 'kg-legend__line--dashed': item.lineType === 'dashed' }"
+                  :style="{ borderColor: item.color, borderWidth: `${item.lineWidth || 2}px` }"
+                ></span>
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
             <div v-if="activeLegendLabel" class="kg-legend__hint">已筛选：{{ activeLegendLabel }}</div>
           </div>
         </div>
@@ -905,7 +922,7 @@ function searchResultSystem(node: KnowledgeNode): string {
           </dl>
         </div>
       </div>
-      <KnowledgeGraphDetailPanel :node="selectedNode" />
+      <KnowledgeGraphDetailPanel :node="selectedNode" :children="selectedChildren" />
     </main>
   </section>
 </template>
