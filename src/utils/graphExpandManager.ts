@@ -125,6 +125,23 @@ export class GraphExpandManager {
     });
   }
 
+  focusContext(id: string) {
+    const contextIds = this.getContextIds(id);
+    this.visibleIds.clear();
+    contextIds.forEach((nodeId) => this.visibleIds.add(nodeId));
+    this.expandedIds.clear();
+    contextIds.forEach((nodeId) => {
+      const children = this.dataset.childrenMap.get(nodeId) || [];
+      if (children.some((childId) => contextIds.has(childId))) this.expandedIds.add(nodeId);
+    });
+  }
+
+  getPathNodes(id: string): KnowledgeNode[] {
+    return this.getPathToRoot(id)
+      .map((nodeId) => this.getNode(nodeId))
+      .filter((node): node is KnowledgeNode => Boolean(node));
+  }
+
   search(keyword: string): KnowledgeNode[] {
     const text = keyword.trim().toLowerCase();
     if (!text) return [];
@@ -159,10 +176,10 @@ export class GraphExpandManager {
       const child = this.dataset.nodeMap.get(childId);
       const current = this.dataset.nodeMap.get(id);
       // planning 一级类 hover 时补充二级类下的三级类，满足对应一级类的完整展示。
-      if (current?.system === 'planning' && current.levelName === '一级类') {
+      if (current?.system?.includes('规划') && current.levelName === '一级类') {
         (this.dataset.childrenMap.get(childId) || []).forEach((grandChildId) => related.add(grandChildId));
       }
-      if (child?.system === 'planning' && child.levelName === '一级类') {
+      if (child?.system?.includes('规划') && child.levelName === '一级类') {
         (this.dataset.childrenMap.get(childId) || []).forEach((grandChildId) => related.add(grandChildId));
       }
     });

@@ -97,7 +97,7 @@ export interface VisibleGraphData {
 
 const TYPE_COLORS: Record<KnowledgeNodeType, string> = {
   root: '#38bdf8',
-  system: '#8b5cf6',
+  system: '#64748b',
   'survey-category': '#fb7185',
   'planning-category': '#84cc16',
   'survey-detail': '#f59e0b',
@@ -105,12 +105,12 @@ const TYPE_COLORS: Record<KnowledgeNodeType, string> = {
 };
 
 const TYPE_SIZES: Record<KnowledgeNodeType, number> = {
-  root: 92,
-  system: 76,
-  'survey-category': 68,
-  'planning-category': 68,
-  'survey-detail': 56,
-  'planning-detail': 56,
+  root: 116,
+  system: 92,
+  'survey-category': 78,
+  'planning-category': 78,
+  'survey-detail': 62,
+  'planning-detail': 62,
 };
 
 const HIERARCHY_LABELS = new Set(['左侧分类体系', '右侧分类体系', '分类体系', '包含']);
@@ -136,7 +136,7 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
       childrenCount: 0,
       x: 0,
       y: 0,
-      size: (node.level || 0) >= 3 ? 46 : TYPE_SIZES[node.type] || 34,
+      size: (node.level || 0) >= 3 ? 52 : TYPE_SIZES[node.type] || 38,
       color: resolveNodeColor(node.type, node.level, node.levelName),
     });
   });
@@ -181,7 +181,7 @@ export function transformKnowledgeGraph(raw: RawKnowledgeGraph): KnowledgeGraphD
         childrenCount: 0,
         x: parent.x,
         y: parent.y,
-        size: childLevel >= 4 ? 46 : TYPE_SIZES[childType],
+        size: childLevel >= 4 ? 52 : TYPE_SIZES[childType],
         color: resolveNodeColor(childType, childLevel, child.levelName),
       });
       appendChild(childrenMap, parentId, childId);

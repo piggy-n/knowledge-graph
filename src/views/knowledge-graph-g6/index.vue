@@ -13,9 +13,11 @@ const router = useRouter();
 const containerRef = ref<HTMLDivElement | null>(null);
 const selectedNode = ref<KnowledgeNode>();
 const message = ref('');
-const relationLabelsVisible = ref(false);
+const relationLabelsVisible = ref(true);
 const searchResults = ref<KnowledgeNode[]>([]);
 const searchKeyword = ref('');
+const searchFocusActive = ref(false);
+const locatedNodeId = ref('');
 const overviewItems = ref<Array<[string, string]>>([]);
 const legendCollapsed = ref(false);
 const overviewCollapsed = ref(false);
@@ -23,8 +25,6 @@ const activeLegendId = ref('');
 const hoveredLegendId = ref('');
 const tooltip = ref({
   visible: false,
-  left: 0,
-  top: 0,
   rows: [] as Array<[string, string]>,
 });
 
@@ -34,18 +34,33 @@ let graphRendered = false;
 let resizeFrame = 0;
 let graphWidth = 0;
 let graphHeight = 0;
+let locateTimer = 0;
+let locateBlinkTimer = 0;
 const layoutCache = new Map<string, { x: number; y: number }>();
 
-type LegendItem = { id: string; type: KnowledgeNodeType; levelName?: string; label: string; color: string };
+type LegendItem = {
+  id: string;
+  label: string;
+  color: string;
+  type?: KnowledgeNodeType;
+  levelName?: string;
+  lineType?: 'solid' | 'dashed';
+  lineWidth?: number;
+};
 
 const legendItems: LegendItem[] = [
   { id: 'root', type: 'root', label: '中心主题', color: '#38bdf8' },
-  { id: 'system', type: 'system', label: '分类体系', color: '#8b5cf6' },
+  { id: 'system', type: 'system', label: '分类体系', color: '#64748b' },
   { id: 'survey-first', type: 'survey-category', levelName: '一级类', label: '国土调查一级类', color: '#fb7185' },
   { id: 'survey-second', type: 'survey-detail', levelName: '二级类', label: '国土调查二级类', color: '#f59e0b' },
   { id: 'planning-first', type: 'planning-category', levelName: '一级类', label: '用地用海一级类', color: '#84cc16' },
   { id: 'planning-second', type: 'planning-detail', levelName: '二级类', label: '用地用海二级类', color: '#a855f7' },
   { id: 'planning-third', type: 'planning-detail', levelName: '三级类', label: '用地用海三级类', color: '#ef4444' },
+  { id: 'edge-mapping', label: '对应关系', color: '#f59e0b', lineType: 'dashed', lineWidth: 2.2 },
+  { id: 'edge-hierarchy', label: '包含关系', color: '#2563eb', lineType: 'solid', lineWidth: 3 },
+  { id: 'edge-hierarchy-strong', label: '粗实线：一级包含', color: '#2563eb', lineType: 'solid', lineWidth: 4.2 },
+  { id: 'edge-hierarchy-medium', label: '中实线：二级包含', color: '#2563eb', lineType: 'solid', lineWidth: 2.8 },
+  { id: 'edge-hierarchy-thin', label: '细实线：三级包含', color: '#2563eb', lineType: 'solid', lineWidth: 1.6 },
 ];
 
 const activeLegendLabel = computed(() => {
@@ -69,6 +84,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+  if (locateTimer) window.clearTimeout(locateTimer);
+  if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
   window.removeEventListener('resize', resizeGraph);
   graph?.destroy();
   graph = undefined;
@@ -119,32 +136,10 @@ function initGraph() {
         },
       },
     },
-    nodeStateStyles: {
-      active: {
-        stroke: '#f59e0b',
-        lineWidth: 4,
-        shadowColor: '#f59e0b',
-        shadowBlur: 18,
-      },
-      inactive: {
-        opacity: 0.14,
-      },
-      selected: {
-        stroke: '#597EF7',
-        lineWidth: 5,
-        shadowColor: '#597EF7',
-        shadowBlur: 26,
-      },
-    },
     edgeStateStyles: {
       active: {
         stroke: '#f59e0b',
-        lineWidth: 2.8,
-        opacity: 1,
-      },
-      selected: {
-        stroke: '#597EF7',
-        lineWidth: 3.2,
+        lineWidth: 4.6,
         opacity: 1,
       },
       inactive: {
@@ -164,18 +159,13 @@ function initGraph() {
   graph.on('canvas:click', () => {
     selectedNode.value = undefined;
     clearHover();
-    applySelectedState();
   });
 
   graph.on('node:mouseenter', (event: any) => {
     const id = event.item?.getModel()?.id;
     if (!id) return;
     applyHover(id);
-    showNodeTooltip(event, manager.getNode(id));
-  });
-
-  graph.on('node:mousemove', (event: any) => {
-    moveTooltip(event);
+    showNodeTooltip(manager.getNode(id));
   });
 
   graph.on('node:mouseleave', () => {
@@ -184,13 +174,12 @@ function initGraph() {
   });
 
   graph.on('edge:mouseenter', (event: any) => {
-    if (event.item) setEdgeTextState(event.item, true);
+    if (event.item) applyEdgeHover(event.item);
   });
 
   graph.on('edge:mouseleave', (event: any) => {
     if (event.item) {
-      setEdgeTextState(event.item, false);
-      applySelectedState();
+      clearHover();
     }
   });
 }
@@ -225,7 +214,7 @@ function renderGraph(focusId?: string) {
   graph.getNodes().forEach((item: any) => graph.clearItemStates(item));
   graph.getEdges().forEach((item: any) => graph.clearItemStates(item));
 
-  applySelectedState(focusId);
+  applyLocatedState();
   applyLegendState();
 }
 
@@ -240,31 +229,45 @@ function toG6Data() {
   return {
     nodes: data.nodes.map((node) => {
       const isRoot = node.type === 'root';
+      const textSpec = getG6NodeTextSpec(node);
       const position = layoutMap.get(node.id) || { x: node.x, y: node.y };
+      const nodeFill = isRoot ? 'l(90) 0:#38bdf8 1:#0ea5e9' : node.color;
+      const nodeLineWidth = isRoot ? 3 : 2;
+      const nodeStyle = {
+        fill: nodeFill,
+        stroke: '#ffffff',
+        lineWidth: nodeLineWidth,
+        shadowColor: node.color,
+        shadowBlur: isRoot ? 22 : 12,
+        cursor: 'pointer',
+        opacity: 0.92,
+      };
       return {
         id: node.id,
-        label: node.displayLines.join('\n'),
+        label: textSpec.lines.join('\n'),
+        originLabel: textSpec.lines.join('\n'),
         x: centerX + position.x,
         y: centerY + position.y,
         size: node.size,
         origin: node,
-        style: {
-          fill: isRoot ? 'l(90) 0:#38bdf8 1:#0ea5e9' : node.color,
-          stroke: '#ffffff',
-          lineWidth: isRoot ? 3 : 2,
-          shadowColor: node.color,
-          shadowBlur: isRoot ? 22 : 12,
-          cursor: 'pointer',
-          opacity: 0.92,
-        },
+        originStyle: { ...nodeStyle },
+        style: { ...nodeStyle },
         labelCfg: {
           position: 'center',
           offset: 0,
+          originStyle: {
+            fill: '#ffffff',
+            fontSize: textSpec.fontSize,
+            fontWeight: isRoot ? 700 : 600,
+            lineHeight: textSpec.lineHeight,
+            textAlign: 'center',
+            textBaseline: 'middle',
+          },
           style: {
             fill: '#ffffff',
-            fontSize: isRoot ? 12 : (node.level || 0) >= 3 ? 8 : 10,
+            fontSize: textSpec.fontSize,
             fontWeight: isRoot ? 700 : 600,
-            lineHeight: isRoot ? 14 : 11,
+            lineHeight: textSpec.lineHeight,
             textAlign: 'center',
             textBaseline: 'middle',
           },
@@ -275,14 +278,69 @@ function toG6Data() {
   };
 }
 
+function getG6NodeTextSpec(node: KnowledgeNode) {
+  const name = node.displayName || node.name || node.label;
+  const length = [...name].length;
+  const radius = node.size / 2;
+  const maxLines = node.type === 'root' || node.type === 'system' ? 3 : 2;
+  let fontSize = 10;
+
+  if (length <= 2) fontSize = Math.min(22, radius * 0.62);
+  else if (length <= 3) fontSize = Math.min(20, radius * 0.56);
+  else if (length <= 5) fontSize = Math.min(16, radius * 0.44);
+  else if (length <= 8) fontSize = Math.min(14, radius * 0.36);
+  else fontSize = Math.max(10, Math.min(12, radius * 0.3));
+
+  const maxCharsPerLine = Math.max(2, Math.floor((radius * 1.52) / fontSize));
+  const lines = wrapG6Text(name, maxCharsPerLine, maxLines);
+  const maxTextHeight = radius * 1.35;
+  const rawLineHeight = fontSize * 1.18;
+  const totalHeight = rawLineHeight * lines.length;
+
+  if (totalHeight > maxTextHeight) {
+    fontSize = Math.max(10, fontSize * (maxTextHeight / totalHeight));
+  }
+
+  fontSize = toEvenFontSize(fontSize);
+  return {
+    lines,
+    fontSize,
+    lineHeight: Math.round(fontSize * 1.2),
+  };
+}
+
+function wrapG6Text(text: string, maxCharsPerLine: number, maxLines: number) {
+  const chars = [...text.replace(/\s+/g, '')];
+  const lines: string[] = [];
+  for (let index = 0; index < chars.length; index += maxCharsPerLine) {
+    lines.push(chars.slice(index, index + maxCharsPerLine).join(''));
+  }
+  if (lines.length > maxLines) {
+    const visible = lines.slice(0, maxLines);
+    const last = visible[visible.length - 1];
+    visible[visible.length - 1] = `${last.slice(0, Math.max(1, maxCharsPerLine - 1))}...`;
+    return visible;
+  }
+  return lines;
+}
+
+function toEvenFontSize(size: number) {
+  const rounded = Math.max(10, Math.round(size));
+  return rounded % 2 === 0 ? rounded : rounded + 1;
+}
+
 function toG6Edge(edge: KnowledgeEdge) {
   const mapping = edge.relationType === 'mapping';
-  const label = relationLabelsVisible.value ? simplifyEdgeLabel(edge) : '';
+  const labelText = simplifyEdgeLabel(edge);
+  const label = relationLabelsVisible.value && isDefaultVisibleLabel(edge) ? labelText : '';
+  const lineWidth = edgeLineWidth(edge);
   return {
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    relationType: edge.relationType,
     label,
+    originLabel: labelText,
     originLabelFill: mapping ? '#b45309' : '#64748b',
     originFontSize: 10,
     originFontWeight: mapping ? 700 : 500,
@@ -301,8 +359,11 @@ function toG6Edge(edge: KnowledgeEdge) {
     },
     style: {
       stroke: mapping ? 'rgba(245, 158, 11, 0.52)' : 'rgba(37, 99, 235, 0.25)',
-      lineWidth: mapping ? 1.4 : 1.1,
-      endArrow: !mapping,
+      lineWidth,
+      endArrow: {
+        path: G6.Arrow.triangle(mapping ? 6 : 8, mapping ? 8 : 10, mapping ? 0 : 2),
+        fill: mapping ? 'rgba(245, 158, 11, 0.6)' : 'rgba(37, 99, 235, 0.76)',
+      },
       opacity: mapping ? 0.78 : 0.6,
       lineDash: mapping ? [5, 5] : undefined,
     },
@@ -335,7 +396,7 @@ function buildForceLayout(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
       d3
         .forceLink<any, any>(links)
         .id((node) => node.id)
-        .distance((link) => (link.relationType === 'mapping' ? 260 : 165))
+        .distance((link) => (link.relationType === 'mapping' ? 300 : 190))
         .strength((link) => (link.relationType === 'mapping' ? 0.08 : 0.45)),
     )
     .force(
@@ -347,7 +408,7 @@ function buildForceLayout(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
         return -300;
       }),
     )
-    .force('collide', d3.forceCollide<any>().radius((node) => node.size / 2 + 30).iterations(2))
+    .force('collide', d3.forceCollide<any>().radius((node) => node.size / 2 + 40).iterations(2))
     .force('x', d3.forceX<any>((node) => node.x || 0).strength(0.06))
     .force('y', d3.forceY<any>((node) => node.y || 0).strength(0.06))
     .stop();
@@ -368,21 +429,38 @@ function buildForceLayout(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
 }
 
 function simplifyEdgeLabel(edge: KnowledgeEdge): string {
+  if (!edge.label || edge.label.includes('无对应') || edge.label.includes('暂无对应')) return '';
   if (edge.label === '对应分类') return '对应';
-  if (edge.label && edge.label !== '对应' && edge.label.includes('对应')) return '';
-  if (edge.label === '包含' || edge.label === '左侧分类体系' || edge.label === '右侧分类体系') return '';
-  return edge.label || '';
+  if (edge.label !== '对应' && edge.label.includes('对应')) return '对应';
+  if (edge.label === '包含') return '包含';
+  if (edge.label === '左侧分类体系' || edge.label === '右侧分类体系') return '分类体系';
+  return edge.label;
 }
 
-function setEdgeTextState(item: any, active: boolean) {
+function isDefaultVisibleLabel(edge: KnowledgeEdge): boolean {
+  return Boolean(simplifyEdgeLabel(edge) && (edge.relationType === 'hierarchy' || edge.relationType === 'mapping'));
+}
+
+function edgeLineWidth(edge: KnowledgeEdge): number {
+  if (edge.relationType === 'mapping') return 1.8;
+  const source = manager.getNode(edge.source);
+  if (source?.type === 'root') return 4.2;
+  if (source?.type === 'system') return 3.4;
+  if (source?.levelName === '一级类') return 2.6;
+  return 1.6;
+}
+
+function setEdgeTextState(item: any, active: boolean, forceHidden = false) {
   const model = item.getModel();
   graph.setItemState(item, 'active', active);
+  const defaultLabel = relationLabelsVisible.value && model.originLabel && (model.relationType === 'hierarchy' || model.relationType === 'mapping') ? model.originLabel : '';
   graph.updateItem(item, {
+    label: forceHidden ? '' : active && relationLabelsVisible.value ? model.originLabel : defaultLabel,
     labelCfg: {
       ...model.labelCfg,
       style: {
         ...model.labelCfg?.style,
-        fill: '#ffffff',
+        fill: active ? '#0f172a' : model.originLabelFill || model.labelCfg?.style?.fill,
         fontSize: active ? 12 : model.originFontSize || model.labelCfg?.style?.fontSize,
         fontWeight: active ? 800 : model.originFontWeight || model.labelCfg?.style?.fontWeight,
         background: {
@@ -400,54 +478,94 @@ function applyHover(id: string) {
   const relatedEdgeIds = manager.getContextEdgeIds(id);
   graph.getNodes().forEach((item: any) => {
     const itemId = item.getModel().id;
-    graph.setItemState(item, 'active', itemId === id);
-    graph.setItemState(item, 'inactive', !relatedIds.has(itemId));
+    const related = relatedIds.has(itemId);
+    updateNodeVisual(item, {
+      hot: itemId === id,
+      dim: itemId !== id && !related,
+      opacity: itemId === id ? 1 : related ? 0.96 : 0.14,
+    });
   });
   graph.getEdges().forEach((item: any) => {
     const model = item.getModel();
     const active = relatedEdgeIds.has(model.id);
-    graph.setItemState(item, 'active', active);
+    setEdgeTextState(item, active, !active);
+    graph.setItemState(item, 'inactive', !active);
+  });
+}
+
+function applyEdgeHover(edgeItem: any) {
+  const edgeId = edgeItem.getModel().id;
+  const model = edgeItem.getModel();
+  const relatedIds = new Set([model.source, model.target]);
+  graph.getNodes().forEach((item: any) => {
+    const related = relatedIds.has(item.getModel().id);
+    const itemId = item.getModel().id;
+    updateNodeVisual(item, {
+      hot: related,
+      dim: !related,
+      opacity: related ? 0.96 : 0.14,
+    });
+  });
+  graph.getEdges().forEach((item: any) => {
+    const active = item.getModel().id === edgeId;
+    setEdgeTextState(item, active, !active);
     graph.setItemState(item, 'inactive', !active);
   });
 }
 
 function clearHover() {
   graph.getNodes().forEach((item: any) => {
-    graph.setItemState(item, 'active', false);
-    graph.setItemState(item, 'inactive', false);
+    updateNodeVisual(item);
   });
   graph.getEdges().forEach((item: any) => {
-    graph.setItemState(item, 'active', false);
+    setEdgeTextState(item, false);
     graph.setItemState(item, 'inactive', false);
   });
-  applySelectedState();
+  applyLocatedState();
+  applyLegendState();
 }
 
-function applySelectedState(focusId?: string) {
+function applyLocatedState() {
   if (!graph) return;
-  const selectedId = focusId || selectedNode.value?.id;
-  const relatedIds = selectedId ? manager.getConnectedIds(selectedId) : new Set<string>();
-  const relatedEdgeIds = selectedId ? manager.getContextEdgeIds(selectedId) : new Set<string>();
   graph.getNodes().forEach((item: any) => {
     const itemId = item.getModel().id;
-    graph.setItemState(item, 'selected', itemId === selectedId);
-    graph.setItemState(item, 'inactive', Boolean(selectedId && !relatedIds.has(itemId)));
+    updateNodeVisual(item, { hot: itemId === locatedNodeId.value });
   });
   graph.getEdges().forEach((item: any) => {
-    const model = item.getModel();
-    const selected = Boolean(selectedId && relatedEdgeIds.has(model.id));
-    graph.setItemState(item, 'selected', selected);
-    graph.setItemState(item, 'inactive', Boolean(selectedId && !selected));
-    setSelectedEdgeTextState(item, selected);
+    graph.setItemState(item, 'inactive', false);
   });
+}
+
+function updateNodeVisual(item: any, options: { hot?: boolean; dim?: boolean; opacity?: number } = {}) {
+  const model = item.getModel();
+  const baseStyle = model.originStyle || model.style || {};
+  const lineWidth = Number(baseStyle.lineWidth || 2);
+  const style = {
+    ...baseStyle,
+    opacity: options.opacity ?? (options.dim ? 0.14 : baseStyle.opacity ?? 0.92),
+  };
+
+  if (options.hot) {
+    Object.assign(style, {
+      stroke: '#f59e0b',
+      lineWidth: Math.max(4, lineWidth + 1.8),
+      shadowColor: '#f59e0b',
+      shadowBlur: 24,
+      opacity: 1,
+    });
+  }
+
+  graph.updateItem(item, { style });
 }
 
 function setLegendHover(id: string) {
+  if (id && !legendItems.find((item) => item.id === id)?.type) return;
   hoveredLegendId.value = id;
   applyLegendState();
 }
 
 function toggleLegend(id: string) {
+  if (!legendItems.find((item) => item.id === id)?.type) return;
   activeLegendId.value = activeLegendId.value === id ? '' : id;
   applyLegendState();
 }
@@ -458,16 +576,12 @@ function applyLegendState() {
   graph.getNodes().forEach((item: any) => {
     const node = item.getModel().origin as KnowledgeNode | undefined;
     const dim = Boolean(legend && node && !matchesLegend(node, legend));
-    graph.updateItem(item, {
-      style: {
-        ...item.getModel().style,
-        opacity: dim ? 0.14 : 0.92,
-      },
-    });
+    updateNodeVisual(item, { dim, opacity: dim ? 0.14 : 0.92 });
   });
 }
 
 function matchesLegend(node: KnowledgeNode, legend: LegendItem): boolean {
+  if (!legend.type) return false;
   if (node.type !== legend.type) return false;
   return !legend.levelName || node.levelName === legend.levelName;
 }
@@ -486,41 +600,12 @@ function updateOverview(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
   ];
 }
 
-function setSelectedEdgeTextState(item: any, selected: boolean) {
-  const model = item.getModel();
-  graph.updateItem(item, {
-    labelCfg: {
-      ...model.labelCfg,
-      style: {
-        ...model.labelCfg?.style,
-        fill: selected ? '#3151c9' : model.originLabelFill || model.labelCfg?.style?.fill,
-        fontSize: selected ? 12 : model.originFontSize || model.labelCfg?.style?.fontSize,
-        fontWeight: selected ? 800 : model.originFontWeight || model.labelCfg?.style?.fontWeight,
-        background: {
-          fill: selected ? 'rgba(235, 242, 255, 0.96)' : 'rgba(255, 255, 255, 0.78)',
-          padding: [3, 6, 3, 6],
-          radius: 5,
-        },
-      },
-    },
-  });
-}
-
-function showNodeTooltip(event: any, node?: KnowledgeNode) {
+function showNodeTooltip(node?: KnowledgeNode) {
   if (!node) return;
   tooltip.value = {
     visible: true,
-    left: 0,
-    top: 0,
     rows: buildTooltipRows(node),
   };
-  moveTooltip(event);
-}
-
-function moveTooltip(event: any) {
-  const rawEvent = event.originalEvent || event;
-  tooltip.value.left = (rawEvent.clientX || 0) + 14;
-  tooltip.value.top = (rawEvent.clientY || 0) + 14;
 }
 
 function hideTooltip() {
@@ -529,10 +614,10 @@ function hideTooltip() {
 
 function buildTooltipRows(node: KnowledgeNode): Array<[string, string]> {
   return [
-    ['层级', node.levelName || ''],
-    ['编号', node.code || ''],
-    ['名称', node.displayName || node.name || node.label],
-    ['所属分类', node.parentLabel || node.system || ''],
+    ['节点名称', formatNodeName(node)],
+    ['节点编码', node.code || ''],
+    ['分类层级', node.levelName || ''],
+    ['所属分类', node.parentLabel || searchResultSystem(node)],
     ['对应关系', node.mapping || ''],
   ].filter((row): row is [string, string] => Boolean(row[1]));
 }
@@ -558,18 +643,40 @@ function resetView() {
   graph.zoomTo(1);
 }
 
-function expandAll() {
-  manager.expandAll();
-  renderGraph(selectedNode.value?.id);
+function fitFullGraphView() {
+  if (!graph) return;
+  graph.fitView(42);
+}
+
+function focusRootStartView() {
+  if (!graph) return;
+  const rootNode = manager.getVisibleGraph().nodes[0];
+  const rootItem = rootNode ? graph.findById(rootNode.id) : undefined;
+  graph.zoomTo(1.35);
+  if (rootItem) graph.focusItem(rootItem, true);
+  else graph.fitCenter();
+}
+
+function relayout() {
+  layoutCache.clear();
+  renderGraph();
   resetView();
 }
 
+function expandAll() {
+  searchFocusActive.value = false;
+  manager.expandAll();
+  renderGraph(selectedNode.value?.id);
+  window.requestAnimationFrame(() => fitFullGraphView());
+}
+
 function collapseAll() {
+  searchFocusActive.value = false;
   manager.collapseAll();
   layoutCache.clear();
   selectedNode.value = manager.getVisibleGraph().nodes[0];
   renderGraph(selectedNode.value?.id);
-  resetView();
+  window.requestAnimationFrame(() => focusRootStartView());
 }
 
 function toggleRelationLabels() {
@@ -585,16 +692,68 @@ function searchNode(keyword: string) {
     return;
   }
   message.value = '';
-  if (searchResults.value.length === 1) selectSearchResult(searchResults.value[0]);
 }
 
 function selectSearchResult(target: KnowledgeNode) {
   searchResults.value = [];
-  manager.revealNode(target.id);
+  searchFocusActive.value = true;
+  manager.focusContext(target.id);
   selectedNode.value = manager.getNode(target.id);
   renderGraph(target.id);
   const item = graph.findById(target.id);
   if (item) graph.focusItem(item, true);
+  flashLocatedNode(target.id);
+}
+
+function restoreFullGraph() {
+  searchFocusActive.value = false;
+  searchResults.value = [];
+  manager.expandAll();
+  renderGraph(selectedNode.value?.id);
+  window.requestAnimationFrame(() => fitFullGraphView());
+}
+
+function flashLocatedNode(id: string) {
+  if (locateTimer) window.clearTimeout(locateTimer);
+  if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
+  locatedNodeId.value = id;
+  applyLocatedState();
+  let visible = true;
+  let blinkCount = 0;
+  locateBlinkTimer = window.setInterval(() => {
+    visible = !visible;
+    blinkCount += 1;
+    const current = graph?.findById(id);
+    if (current) updateNodeVisual(current, { hot: visible, opacity: 1 });
+    if (blinkCount >= 6) {
+      if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
+      locateBlinkTimer = 0;
+      locatedNodeId.value = '';
+      applyLocatedState();
+    }
+  }, 320);
+  locateTimer = window.setTimeout(() => {
+    if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
+    locateBlinkTimer = 0;
+    locatedNodeId.value = '';
+    applyLocatedState();
+  }, 2100);
+}
+
+function searchResultPath(node: KnowledgeNode): string {
+  return manager
+    .getPathNodes(node.id)
+    .filter((item) => item.type !== 'root')
+    .map((item) => formatNodeName(item))
+    .join(' / ');
+}
+
+function searchResultSystem(node: KnowledgeNode): string {
+  if (node.type === 'root') return '中心主题';
+  if (node.type === 'system') return '分类体系';
+  if (node.system?.includes('国土调查')) return '国土调查工作分类';
+  if (node.system?.includes('国土空间')) return '国土空间用地用海分类';
+  return node.parentLabel || '未分组';
 }
 
 function switchVersion() {
@@ -612,7 +771,7 @@ function switchVersion() {
       @reset="resetView"
       @expand-all="expandAll"
       @collapse-all="collapseAll"
-      @relayout="resetView"
+      @relayout="relayout"
       :relation-labels-visible="relationLabelsVisible"
       @toggle-relation-labels="toggleRelationLabels"
       @switch-version="switchVersion"
@@ -620,7 +779,10 @@ function switchVersion() {
     <main class="kg-shell">
       <div class="kg-stage kg-stage--light">
         <div v-if="message" class="kg-message">{{ message }}</div>
-        <div v-if="searchResults.length > 1" class="kg-search-results">
+        <button v-if="searchFocusActive" type="button" class="kg-focus-exit" @click="restoreFullGraph">
+          返回全部图谱
+        </button>
+        <div v-if="searchResults.length" class="kg-search-results">
           <div class="kg-search-results__header">
             <strong>搜索结果</strong>
             <span>{{ searchKeyword }} · {{ searchResults.length }} 个</span>
@@ -633,7 +795,8 @@ function switchVersion() {
             @click="selectSearchResult(node)"
           >
             <span>{{ formatNodeName(node) }}</span>
-            <small>{{ node.levelName }} · {{ node.system || node.parentLabel }}</small>
+            <small>{{ searchResultSystem(node) }} / {{ node.levelName || '分类节点' }} / {{ node.code || '无编码' }}</small>
+            <em>{{ searchResultPath(node) }}</em>
           </button>
         </div>
         <div ref="containerRef" class="kg-canvas"></div>
@@ -648,12 +811,18 @@ function switchVersion() {
               :key="item.id"
               type="button"
               class="kg-legend__item"
-              :class="{ 'is-active': activeLegendId === item.id }"
+              :class="{ 'is-active': activeLegendId === item.id, 'kg-legend__item--line': item.lineType }"
               @mouseenter="setLegendHover(item.id)"
               @mouseleave="setLegendHover('')"
               @click="toggleLegend(item.id)"
             >
-              <span class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
+              <span
+                v-if="item.lineType"
+                class="kg-legend__line"
+                :class="{ 'kg-legend__line--dashed': item.lineType === 'dashed' }"
+                :style="{ borderColor: item.color, borderWidth: `${item.lineWidth || 2}px` }"
+              ></span>
+              <span v-else class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
               <span>{{ item.label }}</span>
             </button>
             <div v-if="activeLegendLabel" class="kg-legend__hint">已筛选：{{ activeLegendLabel }}</div>
@@ -674,7 +843,6 @@ function switchVersion() {
         <div
           v-if="tooltip.visible"
           class="kg-node-tooltip"
-          :style="{ left: `${tooltip.left}px`, top: `${tooltip.top}px` }"
         >
           <dl v-for="[label, value] in tooltip.rows" :key="label">
             <dt>{{ label }}</dt>

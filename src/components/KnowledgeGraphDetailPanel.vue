@@ -10,11 +10,12 @@ const props = defineProps<{
 const rows = computed(() => {
   if (!props.node) return [];
   const node = props.node;
+  const systemLabel = node.system === 'survey' ? '国土调查工作分类' : node.system === 'planning' ? '国土空间用地用海分类' : node.system;
   return [
     ['节点名称', formatNodeName(node)],
     ['节点编码', node.code],
     ['分类层级', node.levelName],
-    ['所属分类', node.parentLabel || node.system],
+    ['所属分类', node.parentLabel || systemLabel],
     ['对应关系', node.mapping],
     ['子节点数量', node.childrenCount ? String(node.childrenCount) : undefined],
   ].filter((row): row is [string, string] => Boolean(row[1]));
