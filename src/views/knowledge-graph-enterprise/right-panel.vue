@@ -97,3 +97,117 @@ function handleQuickSearch(value) {
     </section>
   </main>
 </template>
+
+<style scoped>
+.kg-enterprise-right {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.kg-toolbar {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 88px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.1);
+}
+
+.kg-toolbar__actions {
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+
+.kg-toolbar .el-button + .el-button {
+  margin-left: 0;
+}
+
+.kg-enterprise-search {
+  width: 320px;
+}
+
+.kg-enterprise-search-area {
+  display: flex;
+  flex: 0 0 430px;
+  min-width: 360px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kg-enterprise-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kg-enterprise-quick-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.kg-enterprise-quick-tag {
+  cursor: pointer;
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(239, 246, 255, 0.72);
+}
+
+.kg-toolbar .el-button {
+  height: 32px;
+  border-radius: 7px;
+  color: #1e3a5f;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(37, 99, 235, 0.18);
+  font-weight: 700;
+}
+
+.kg-toolbar .el-button--primary {
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.kg-toolbar .el-button:hover {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: rgba(37, 99, 235, 0.38);
+}
+
+.kg-toolbar .el-button--primary:hover {
+  color: #ffffff;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.kg-enterprise-stage {
+  flex: 1;
+  min-height: 0;
+}
+
+.kg-enterprise-results {
+  top: 18px;
+  left: 18px;
+  width: 340px;
+  max-height: none;
+  overflow: hidden;
+}
+
+.kg-enterprise-results-list {
+  max-height: 156px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+</style>
