@@ -62,9 +62,6 @@ const legendItems: LegendItem[] = [
   { id: 'planning-third', type: 'planning-detail', levelName: '三级类', label: '用地用海三级类', color: '#ef4444' },
   { id: 'edge-mapping', label: '对应关系', color: '#f59e0b', lineType: 'dashed', lineWidth: 2.2 },
   { id: 'edge-hierarchy', label: '包含关系', color: '#2563eb', lineType: 'solid', lineWidth: 3 },
-  { id: 'edge-hierarchy-strong', label: '粗实线：一级包含', color: '#2563eb', lineType: 'solid', lineWidth: 4.2 },
-  { id: 'edge-hierarchy-medium', label: '中实线：二级包含', color: '#2563eb', lineType: 'solid', lineWidth: 2.8 },
-  { id: 'edge-hierarchy-thin', label: '细实线：三级包含', color: '#2563eb', lineType: 'solid', lineWidth: 1.6 },
 ];
 
 const activeLegendLabel = computed(() => {
