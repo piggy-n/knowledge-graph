@@ -134,11 +134,6 @@ function initGraph() {
       },
     },
     edgeStateStyles: {
-      active: {
-        stroke: '#f59e0b',
-        lineWidth: 4.6,
-        opacity: 1,
-      },
       inactive: {
         opacity: 0.1,
       },
@@ -331,6 +326,16 @@ function toG6Edge(edge: KnowledgeEdge) {
   const labelText = simplifyEdgeLabel(edge);
   const label = relationLabelsVisible.value && isDefaultVisibleLabel(edge) ? labelText : '';
   const lineWidth = edgeLineWidth(edge);
+  const edgeStyle = {
+    stroke: mapping ? 'rgba(245, 158, 11, 0.52)' : 'rgba(37, 99, 235, 0.25)',
+    lineWidth,
+    endArrow: {
+      path: G6.Arrow.triangle(mapping ? 6 : 8, mapping ? 8 : 10, mapping ? 0 : 2),
+      fill: mapping ? 'rgba(245, 158, 11, 0.6)' : 'rgba(37, 99, 235, 0.76)',
+    },
+    opacity: mapping ? 0.78 : 0.6,
+    lineDash: mapping ? [5, 5] : undefined,
+  };
   return {
     id: edge.id,
     source: edge.source,
@@ -354,16 +359,8 @@ function toG6Edge(edge: KnowledgeEdge) {
         },
       },
     },
-    style: {
-      stroke: mapping ? 'rgba(245, 158, 11, 0.52)' : 'rgba(37, 99, 235, 0.25)',
-      lineWidth,
-      endArrow: {
-        path: G6.Arrow.triangle(mapping ? 6 : 8, mapping ? 8 : 10, mapping ? 0 : 2),
-        fill: mapping ? 'rgba(245, 158, 11, 0.6)' : 'rgba(37, 99, 235, 0.76)',
-      },
-      opacity: mapping ? 0.78 : 0.6,
-      lineDash: mapping ? [5, 5] : undefined,
-    },
+    originStyle: { ...edgeStyle },
+    style: { ...edgeStyle },
   };
 }
 
@@ -449,7 +446,7 @@ function edgeLineWidth(edge: KnowledgeEdge): number {
 
 function setEdgeTextState(item: any, active: boolean, forceHidden = false) {
   const model = item.getModel();
-  graph.setItemState(item, 'active', active);
+  updateEdgeVisual(item, active);
   const defaultLabel = relationLabelsVisible.value && model.originLabel && (model.relationType === 'hierarchy' || model.relationType === 'mapping') ? model.originLabel : '';
   graph.updateItem(item, {
     label: forceHidden ? '' : active && relationLabelsVisible.value ? model.originLabel : defaultLabel,
@@ -465,6 +462,25 @@ function setEdgeTextState(item: any, active: boolean, forceHidden = false) {
           padding: [3, 6, 3, 6],
           radius: 5,
         },
+      },
+    },
+  });
+}
+
+function updateEdgeVisual(item: any, active = false) {
+  const model = item.getModel();
+  const baseStyle = model.originStyle || model.style || {};
+  const mapping = model.relationType === 'mapping';
+  const lineWidth = Number(baseStyle.lineWidth || 1.6);
+  graph.updateItem(item, {
+    style: {
+      ...baseStyle,
+      stroke: active && mapping ? '#f59e0b' : baseStyle.stroke,
+      lineWidth: active ? lineWidth + (mapping ? 1.4 : 1.8) : lineWidth,
+      opacity: active ? 1 : baseStyle.opacity ?? 0.6,
+      endArrow: {
+        ...(baseStyle.endArrow || {}),
+        fill: active && mapping ? '#f59e0b' : baseStyle.endArrow?.fill,
       },
     },
   });
@@ -645,6 +661,24 @@ function fitFullGraphView() {
   graph.fitView(42);
 }
 
+function fitContextView(contextIds: Set<string>, focusId?: string) {
+  if (!graph || !containerRef.value) return;
+  const items = [...contextIds].map((id) => graph.findById(id)).filter(Boolean);
+  if (!items.length) {
+    resetView();
+    return;
+  }
+
+  graph.fitView(72);
+  if (focusId) {
+    const focusItem = graph.findById(focusId);
+    if (focusItem) graph.focusItem(focusItem, true);
+  }
+  const zoom = graph.getZoom ? graph.getZoom() : 1;
+  if (zoom < 0.62) graph.zoomTo(0.62);
+  if (zoom > 1.28) graph.zoomTo(1.28);
+}
+
 function focusRootStartView() {
   if (!graph) return;
   const rootNode = manager.getVisibleGraph().nodes[0];
@@ -657,7 +691,7 @@ function focusRootStartView() {
 function relayout() {
   layoutCache.clear();
   renderGraph();
-  resetView();
+  window.setTimeout(() => fitFullGraphView(), 180);
 }
 
 function expandAll() {
@@ -697,8 +731,8 @@ function selectSearchResult(target: KnowledgeNode) {
   manager.focusContext(target.id);
   selectedNode.value = manager.getNode(target.id);
   renderGraph(target.id);
-  const item = graph.findById(target.id);
-  if (item) graph.focusItem(item, true);
+  const contextIds = manager.getConnectedIds(target.id);
+  window.setTimeout(() => fitContextView(contextIds, target.id), 180);
   flashLocatedNode(target.id);
 }
 
