@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { ElButton, ElIcon, ElInput, ElSwitch, ElTag } from 'element-plus';
-import { Back, Connection, Fold, Refresh, Search, View } from '@element-plus/icons-vue';
+import { ArrowDown, ArrowRight, ArrowUp, Back, Close, Connection, Fold, Refresh, Search, View } from '@element-plus/icons-vue';
 import { formatNodeName } from './graph-data';
 
 const props = defineProps({
@@ -15,6 +15,9 @@ const props = defineProps({
 
 const emit = defineEmits(['search', 'expand-all', 'collapse-all', 'toggle-relation-labels', 'relayout', 'select-result', 'restore-full-graph']);
 const keyword = ref(props.searchKeyword);
+const resultsClosed = ref(false);
+const resultsCollapsed = ref(false);
+const activeResultId = ref('');
 const quickKeywords = ['用地', '耕地', '湿地', '交通', '水域'];
 
 watch(
@@ -25,12 +28,28 @@ watch(
 );
 
 function handleSearch() {
+  resultsClosed.value = false;
+  resultsCollapsed.value = false;
+  activeResultId.value = '';
   emit('search', keyword.value);
 }
 
 function handleQuickSearch(value) {
   keyword.value = value;
+  resultsClosed.value = false;
+  resultsCollapsed.value = false;
+  activeResultId.value = '';
   emit('search', value);
+}
+
+function handleSelectResult(node) {
+  activeResultId.value = node.id;
+  resultsCollapsed.value = true;
+  emit('select-result', node);
+}
+
+function closeResults() {
+  resultsClosed.value = true;
 }
 </script>
 
@@ -105,22 +124,52 @@ function handleQuickSearch(value) {
       >
         返回全部图谱
       </ElButton>
-      <div v-if="searchResults.length" class="kg-search-results kg-enterprise-results">
-        <div class="kg-search-results__header">
-          <strong>搜索结果</strong>
-          <span>{{ searchKeyword }} · {{ searchResults.length }} 个</span>
+      <div
+        v-if="searchResults.length && !resultsClosed"
+        class="kg-search-results kg-enterprise-results"
+        :class="{ 'is-collapsed': resultsCollapsed }"
+      >
+        <div class="kg-enterprise-results-header">
+          <div class="kg-enterprise-results-title">
+            <ElIcon class="kg-enterprise-results-icon"><Search /></ElIcon>
+            <div>
+              <strong>搜索结果</strong>
+              <p>关键词：<em>{{ searchKeyword }}</em></p>
+            </div>
+          </div>
+          <div class="kg-enterprise-results-tools">
+            <span>共 {{ searchResults.length }} 个结果</span>
+            <ElButton
+              class="kg-enterprise-result-tool"
+              :icon="resultsCollapsed ? ArrowDown : ArrowUp"
+              @click="resultsCollapsed = !resultsCollapsed"
+            />
+            <ElButton class="kg-enterprise-result-tool" :icon="Close" @click="closeResults" />
+          </div>
         </div>
-        <div class="kg-enterprise-results-list">
-          <button
-            v-for="node in searchResults"
-            :key="node.id"
-            type="button"
-            class="kg-search-results__item"
-            @click="emit('select-result', node)"
-          >
-            <span>{{ formatNodeName(node) }}</span>
-            <em>{{ searchResultPath(node) }}</em>
-          </button>
+
+        <div class="kg-enterprise-results-body">
+          <div class="kg-enterprise-results-divider"></div>
+          <div class="kg-enterprise-results-list">
+            <button
+              v-for="(node, index) in searchResults"
+              :key="node.id"
+              type="button"
+              class="kg-enterprise-result-card"
+              :class="{ 'is-active': activeResultId === node.id }"
+              @click="handleSelectResult(node)"
+            >
+              <span class="kg-enterprise-result-index">{{ index + 1 }}</span>
+              <span class="kg-enterprise-result-main">
+                <strong>{{ formatNodeName(node) }}</strong>
+                <em>{{ searchResultPath(node) }}</em>
+              </span>
+              <ElTag v-if="node.levelName" class="kg-enterprise-result-tag" size="small" effect="plain">
+                {{ node.levelName }}
+              </ElTag>
+              <ElIcon class="kg-enterprise-result-arrow"><ArrowRight /></ElIcon>
+            </button>
+          </div>
         </div>
       </div>
       <slot name="canvas"></slot>
@@ -350,14 +399,241 @@ function handleQuickSearch(value) {
 .kg-enterprise-results {
   top: 18px;
   left: 18px;
-  width: 340px;
-  max-height: none;
+  width: min(430px, calc(100% - 36px));
+  max-height: calc(100% - 36px);
+  padding: 18px;
   overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box;
+  transition: width 0.2s ease, padding 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kg-enterprise-results.is-collapsed {
+  width: min(360px, calc(100% - 36px));
+  padding-bottom: 18px;
+}
+
+.kg-enterprise-results-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.kg-enterprise-results-title {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kg-enterprise-results-icon {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 22px;
+}
+
+.kg-enterprise-results-title strong {
+  display: block;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.kg-enterprise-results-title p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.kg-enterprise-results-title em {
+  color: #2563eb;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.kg-enterprise-results-tools {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.kg-enterprise-results-tools > span {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.kg-enterprise-result-tool {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  color: #64748b;
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.kg-enterprise-result-tool:hover {
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.3);
+  background: #eff6ff;
+}
+
+.kg-enterprise-results-body {
+  max-height: min(456px, calc(100vh - 300px));
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.24s ease, opacity 0.2s ease, margin-top 0.24s ease;
+}
+
+.kg-enterprise-results.is-collapsed .kg-enterprise-results-body {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+.kg-enterprise-results-divider {
+  height: 1px;
+  margin: 16px 0 14px;
+  background: rgba(148, 163, 184, 0.22);
 }
 
 .kg-enterprise-results-list {
-  max-height: 156px;
+  max-height: min(380px, calc(100vh - 378px));
   overflow-y: auto;
-  padding-right: 2px;
+  padding: 0 2px 2px 0;
+}
+
+.kg-enterprise-results-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.kg-enterprise-results-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.34);
+}
+
+.kg-enterprise-results-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kg-enterprise-result-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(36px, auto) minmax(0, 1fr) auto 18px;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  min-height: 82px;
+  margin: 0 0 12px;
+  padding: 14px 14px 14px 20px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.kg-enterprise-result-card::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: transparent;
+  content: '';
+}
+
+.kg-enterprise-result-card:hover {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.kg-enterprise-result-card.is-active {
+  border-color: #2563eb;
+  background: rgba(239, 246, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.1);
+}
+
+.kg-enterprise-result-card.is-active::before {
+  background: #2563eb;
+}
+
+.kg-enterprise-result-index {
+  grid-column: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: rgba(219, 234, 254, 0.9);
+  color: #2563eb;
+  font-size: 15px;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.kg-enterprise-result-main {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.kg-enterprise-result-main strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.kg-enterprise-result-main em {
+  display: block;
+  margin-top: 6px;
+  color: #475569;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.kg-enterprise-result-tag {
+  grid-column: 3;
+  align-self: center;
+  border-color: rgba(37, 99, 235, 0.14);
+  border-radius: 6px;
+  background: rgba(219, 234, 254, 0.84);
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.kg-enterprise-result-arrow {
+  grid-column: 4;
+  color: #64748b;
+  font-size: 16px;
+}
+
+.kg-enterprise-result-card.is-active .kg-enterprise-result-arrow {
+  color: #2563eb;
 }
 </style>

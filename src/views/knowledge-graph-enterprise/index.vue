@@ -698,7 +698,6 @@ function searchNode(keyword) {
 }
 
 function selectSearchResult(target) {
-  searchResults.value = [];
   searchFocusActive.value = true;
   manager.focusContext(target.id);
   selectedNode.value = manager.getNode(target.id);
