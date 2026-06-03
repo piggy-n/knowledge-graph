@@ -139,12 +139,14 @@ function closeResults() {
           </div>
           <div class="kg-enterprise-results-tools">
             <span>共 {{ searchResults.length }} 个结果</span>
-            <ElButton
-              class="kg-enterprise-result-tool"
-              :icon="resultsCollapsed ? ArrowDown : ArrowUp"
-              @click="resultsCollapsed = !resultsCollapsed"
-            />
-            <ElButton class="kg-enterprise-result-tool" :icon="Close" @click="closeResults" />
+            <div class="kg-enterprise-result-actions">
+              <ElButton
+                class="kg-enterprise-result-tool"
+                :icon="resultsCollapsed ? ArrowDown : ArrowUp"
+                @click="resultsCollapsed = !resultsCollapsed"
+              />
+              <ElButton class="kg-enterprise-result-tool" :icon="Close" @click="closeResults" />
+            </div>
           </div>
         </div>
 
@@ -397,14 +399,14 @@ function closeResults() {
 }
 
 .kg-enterprise-results {
-  top: 18px;
-  left: 18px;
-  width: min(430px, calc(100% - 36px));
+  top: 14px;
+  left: 14px;
+  width: min(350px, calc(100% - 28px));
   max-height: calc(100% - 36px);
-  padding: 18px;
+  padding: 14px;
   overflow: hidden;
   border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(10px);
@@ -413,43 +415,43 @@ function closeResults() {
 }
 
 .kg-enterprise-results.is-collapsed {
-  width: min(360px, calc(100% - 36px));
-  padding-bottom: 18px;
+  width: min(310px, calc(100% - 28px));
+  padding-bottom: 14px;
 }
 
 .kg-enterprise-results-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px;
 }
 
 .kg-enterprise-results-title {
   display: flex;
   min-width: 0;
   align-items: flex-start;
-  gap: 12px;
+  gap: 7px;
 }
 
 .kg-enterprise-results-icon {
   flex: 0 0 auto;
-  margin-top: 4px;
+  margin-top: 2px;
   color: #2563eb;
-  font-size: 22px;
+  font-size: 16px;
 }
 
 .kg-enterprise-results-title strong {
   display: block;
   color: #0f172a;
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1.25;
 }
 
 .kg-enterprise-results-title p {
-  margin: 6px 0 0;
+  margin: 3px 0 0;
   color: #64748b;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   line-height: 1.35;
 }
@@ -464,21 +466,31 @@ function closeResults() {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 8px;
+  gap: 6px;
 }
 
 .kg-enterprise-results-tools > span {
   color: #475569;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
 }
 
+.kg-enterprise-result-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kg-enterprise-result-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
 .kg-enterprise-result-tool {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #64748b;
   border-color: rgba(148, 163, 184, 0.22);
   background: rgba(255, 255, 255, 0.92);
@@ -491,7 +503,7 @@ function closeResults() {
 }
 
 .kg-enterprise-results-body {
-  max-height: min(456px, calc(100vh - 300px));
+  max-height: min(248px, calc(100vh - 300px));
   overflow: hidden;
   opacity: 1;
   transition: max-height 0.24s ease, opacity 0.2s ease, margin-top 0.24s ease;
@@ -505,12 +517,12 @@ function closeResults() {
 
 .kg-enterprise-results-divider {
   height: 1px;
-  margin: 16px 0 14px;
+  margin: 12px 0 10px;
   background: rgba(148, 163, 184, 0.22);
 }
 
 .kg-enterprise-results-list {
-  max-height: min(380px, calc(100vh - 378px));
+  max-height: min(220px, calc(100vh - 378px));
   overflow-y: auto;
   padding: 0 2px 2px 0;
 }
@@ -531,13 +543,13 @@ function closeResults() {
 .kg-enterprise-result-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(36px, auto) minmax(0, 1fr) auto 18px;
+  grid-template-columns: minmax(30px, auto) minmax(0, 1fr) auto 16px;
   align-items: center;
   width: 100%;
-  gap: 12px;
-  min-height: 82px;
-  margin: 0 0 12px;
-  padding: 14px 14px 14px 20px;
+  gap: 9px;
+  min-height: 64px;
+  margin: 0 0 8px;
+  padding: 10px 10px 10px 16px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 10px;
@@ -579,13 +591,13 @@ function closeResults() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 7px;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 7px;
+  border-radius: 6px;
   background: rgba(219, 234, 254, 0.9);
   color: #2563eb;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 800;
   box-sizing: border-box;
 }
@@ -598,7 +610,7 @@ function closeResults() {
 .kg-enterprise-result-main strong {
   display: block;
   color: #0f172a;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 800;
   line-height: 1.4;
   white-space: normal;
@@ -607,9 +619,9 @@ function closeResults() {
 
 .kg-enterprise-result-main em {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
   color: #475569;
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 500;
   line-height: 1.45;
@@ -630,7 +642,7 @@ function closeResults() {
 .kg-enterprise-result-arrow {
   grid-column: 4;
   color: #64748b;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .kg-enterprise-result-card.is-active .kg-enterprise-result-arrow {
