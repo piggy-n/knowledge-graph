@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
-import { ElButton, ElInput, ElTag } from 'element-plus';
-import { Back, Connection, Fold, Hide, Refresh, Search, View } from '@element-plus/icons-vue';
+import { ElButton, ElIcon, ElInput, ElSwitch, ElTag } from 'element-plus';
+import { Back, Connection, Fold, Refresh, Search, View } from '@element-plus/icons-vue';
 import { formatNodeName } from './graph-data';
 
 const props = defineProps({
@@ -37,7 +37,7 @@ function handleQuickSearch(value) {
 <template>
   <main class="kg-enterprise-right">
     <header class="kg-toolbar kg-enterprise-toolbar">
-      <div class="kg-enterprise-search-area">
+      <section class="kg-enterprise-search-area">
         <div class="kg-enterprise-search-row">
           <ElInput
             v-model="keyword"
@@ -50,6 +50,7 @@ function handleQuickSearch(value) {
           <ElButton type="primary" :icon="Search" @click="handleSearch">搜索</ElButton>
         </div>
         <div class="kg-enterprise-quick-tags">
+          <span class="kg-enterprise-quick-label">热门检索</span>
           <ElTag
             v-for="item in quickKeywords"
             :key="item"
@@ -61,15 +62,36 @@ function handleQuickSearch(value) {
             {{ item }}
           </ElTag>
         </div>
-      </div>
-      <div class="kg-toolbar__actions">
-        <ElButton :icon="Connection" @click="emit('expand-all')">全部展开</ElButton>
-        <ElButton :icon="Fold" @click="emit('collapse-all')">全部收起</ElButton>
-        <ElButton :icon="relationLabelsVisible ? Hide : View" @click="emit('toggle-relation-labels')">
-          {{ relationLabelsVisible ? '隐藏关系文字' : '显示关系文字' }}
-        </ElButton>
-        <ElButton :icon="Refresh" class="kg-toolbar__ghost" @click="emit('relayout')">重算布局</ElButton>
-      </div>
+      </section>
+
+      <section class="kg-toolbar__actions">
+        <div class="kg-action-group">
+          <div class="kg-action-group__title">展开 / 收起</div>
+          <div class="kg-action-group__body">
+            <ElButton :icon="Connection" @click="emit('expand-all')">全部展开</ElButton>
+            <ElButton :icon="Fold" @click="emit('collapse-all')">全部收起</ElButton>
+          </div>
+        </div>
+
+        <div class="kg-action-group">
+          <div class="kg-action-group__title">显示设置</div>
+          <div class="kg-action-group__body kg-display-setting">
+            <ElIcon class="kg-display-setting__icon"><View /></ElIcon>
+            <span>显示关系文字</span>
+            <ElSwitch
+              :model-value="relationLabelsVisible"
+              @change="emit('toggle-relation-labels')"
+            />
+          </div>
+        </div>
+
+        <div class="kg-action-group">
+          <div class="kg-action-group__title">布局操作</div>
+          <div class="kg-action-group__body">
+            <ElButton :icon="Refresh" class="kg-toolbar__ghost" @click="emit('relayout')">重算布局</ElButton>
+          </div>
+        </div>
+      </section>
     </header>
 
     <section class="kg-stage kg-stage--light kg-enterprise-stage">
@@ -119,22 +141,28 @@ function handleQuickSearch(value) {
 }
 
 .kg-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
   flex: 0 0 auto;
   height: auto;
-  min-height: 88px;
-  padding: 12px 18px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.1);
+  min-height: 112px;
+  padding: 24px 24px 18px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
 .kg-toolbar__actions {
+  display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
-  gap: 8px;
+  gap: 0;
 }
 
 .kg-toolbar .el-button + .el-button {
@@ -142,44 +170,77 @@ function handleQuickSearch(value) {
 }
 
 .kg-enterprise-search {
-  width: 320px;
+  width: min(430px, 100%);
 }
 
 .kg-enterprise-search-area {
   display: flex;
-  flex: 0 0 430px;
+  flex: 1 1 480px;
   min-width: 360px;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
 }
 
 .kg-enterprise-search-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
+}
+
+.kg-enterprise-search-row .el-button {
+  min-width: 84px;
+  height: 46px;
+  border-radius: 5px;
+}
+
+:deep(.kg-enterprise-search .el-input__wrapper) {
+  min-height: 46px;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.34) inset;
+}
+
+:deep(.kg-enterprise-search .el-input__inner) {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .kg-enterprise-quick-tags {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   min-height: 22px;
+}
+
+.kg-enterprise-quick-label {
+  margin-right: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .kg-enterprise-quick-tag {
   cursor: pointer;
-  border-color: rgba(37, 99, 235, 0.18);
-  background: rgba(239, 246, 255, 0.72);
+  height: 24px;
+  padding: 0 11px;
+  border-color: rgba(37, 99, 235, 0.14);
+  border-radius: 5px;
+  background: rgba(239, 246, 255, 0.86);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .kg-toolbar .el-button {
   height: 32px;
-  border-radius: 7px;
+  border-radius: 5px;
   color: #1e3a5f;
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(37, 99, 235, 0.18);
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .kg-toolbar .el-button--primary {
@@ -198,6 +259,68 @@ function handleQuickSearch(value) {
   color: #ffffff;
   background: #1d4ed8;
   border-color: #1d4ed8;
+}
+
+.kg-action-group {
+  position: relative;
+  display: flex;
+  min-height: 70px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 24px;
+}
+
+.kg-action-group + .kg-action-group {
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.kg-action-group__title {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.kg-action-group__body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.kg-display-setting {
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kg-display-setting__icon {
+  color: #64748b;
+  font-size: 16px;
+}
+
+:deep(.kg-display-setting .el-switch__core) {
+  border-color: transparent;
+}
+
+@media (max-width: 1280px) {
+  .kg-toolbar {
+    align-items: flex-start;
+  }
+
+  .kg-toolbar__actions {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .kg-action-group:first-child {
+    padding-left: 0;
+  }
 }
 
 .kg-enterprise-stage {
