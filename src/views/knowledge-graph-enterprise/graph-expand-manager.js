@@ -107,6 +107,32 @@ export class GraphExpandManager {
     this.expandedIds.delete(id);
   }
 
+  // 搜索局部图内双击展开 / 收起，避免把全图子级带入局部视图。
+  toggleInContext(id, contextId) {
+    if (!this.hasChildren(id)) return;
+    const contextIds = this.getContextIds(contextId);
+    if (this.expandedIds.has(id)) {
+      this.collapseWithinContext(id, contextIds);
+    } else {
+      this.expandWithinContext(id, contextIds);
+    }
+  }
+
+  expandWithinContext(id, contextIds) {
+    const children = (this.dataset.childrenMap.get(id) || []).filter((childId) => contextIds.has(childId));
+    children.forEach((childId) => this.visibleIds.add(childId));
+    if (children.length) this.expandedIds.add(id);
+  }
+
+  collapseWithinContext(id, contextIds) {
+    const children = (this.dataset.childrenMap.get(id) || []).filter((childId) => contextIds.has(childId));
+    children.forEach((childId) => {
+      this.collapseWithinContext(childId, contextIds);
+      this.visibleIds.delete(childId);
+    });
+    this.expandedIds.delete(id);
+  }
+
   expandAll() {
     this.dataset.nodeMap.forEach((_node, id) => this.visibleIds.add(id));
     this.dataset.childrenMap.forEach((children, id) => {
@@ -132,10 +158,19 @@ export class GraphExpandManager {
     const contextIds = this.getContextIds(id);
     this.visibleIds.clear();
     contextIds.forEach((nodeId) => this.visibleIds.add(nodeId));
+    this.syncExpandedIdsWithinVisible(contextIds);
+  }
+
+  expandContext(id) {
+    this.focusContext(id);
+  }
+
+  // 根据当前可见节点同步展开标记，避免局部视图状态错位。
+  syncExpandedIdsWithinVisible(visibleIds) {
     this.expandedIds.clear();
-    contextIds.forEach((nodeId) => {
+    visibleIds.forEach((nodeId) => {
       const children = this.dataset.childrenMap.get(nodeId) || [];
-      if (children.some((childId) => contextIds.has(childId))) this.expandedIds.add(nodeId);
+      if (children.some((childId) => visibleIds.has(childId))) this.expandedIds.add(nodeId);
     });
   }
 

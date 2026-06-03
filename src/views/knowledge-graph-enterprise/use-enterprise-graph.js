@@ -14,7 +14,10 @@ export function useEnterpriseGraph() {
   const relationLabelsVisible = ref(true);
   const searchResults = ref([]);
   const searchKeyword = ref('');
-  const searchFocusActive = ref(false);
+  // 图谱数据视图模式：fullGraph 为完整图谱，searchGraph 为搜索局部关系图。
+  const graphViewMode = ref('fullGraph');
+  // 搜索结果进入局部关系视图时的上下文节点，供展开、收起、重算布局复用。
+  const searchContextId = ref('');
   const locatedNodeId = ref('');
   const selectedFocusId = ref('');
   const overviewItems = ref([]);
@@ -33,6 +36,7 @@ export function useEnterpriseGraph() {
   let graphHeight = 0;
   let locateTimer = 0;
   let locateBlinkTimer = 0;
+  let nodeClickTimer = 0;
   const layoutCache = new Map();
   let graphMounted = false;
 
@@ -92,7 +96,7 @@ export function useEnterpriseGraph() {
     searchResults: searchResults.value,
     relationLabelsVisible: relationLabelsVisible.value,
     message: message.value,
-    searchFocusActive: searchFocusActive.value,
+    searchFocusActive: graphViewMode.value === 'searchGraph',
     searchResultPath,
   }));
 
@@ -124,6 +128,7 @@ export function useEnterpriseGraph() {
     if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     if (locateTimer) window.clearTimeout(locateTimer);
     if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
+    clearPendingNodeClick();
     window.removeEventListener('resize', resizeGraph);
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
     graph?.destroy();
@@ -217,23 +222,40 @@ export function useEnterpriseGraph() {
         return;
       }
       if (graphMode.value !== 'select') return;
-      selectedNode.value = manager.getNode(id);
-      selectedFocusId.value = id;
-      applySelectedFocus();
+      clearPendingNodeClick();
+      nodeClickTimer = window.setTimeout(() => {
+        nodeClickTimer = 0;
+        selectedNode.value = manager.getNode(id);
+        selectedFocusId.value = id;
+        applySelectedFocus();
+      }, 260);
     });
 
     graph.on('node:dblclick', (event) => {
       const id = event.item?.getModel()?.id;
       if (!id) return;
       if (graphMode.value !== 'select') return;
+      clearPendingNodeClick();
+      const contextId = getActiveSearchContextId();
+      if (contextId) {
+        manager.toggleInContext(id, contextId);
+        selectedNode.value = manager.getNode(id);
+        clearFocusVisualState();
+        renderGraph(id);
+        clearFocusVisualState();
+        window.requestAnimationFrame(() => fitVisibleSearchContextView(contextId));
+        return;
+      }
       manager.toggle(id);
       selectedNode.value = manager.getNode(id);
-      selectedFocusId.value = id;
+      clearFocusVisualState();
       renderGraph(id);
+      clearFocusVisualState();
     });
 
     graph.on('canvas:click', () => {
       if (graphMode.value !== 'select') return;
+      clearPendingNodeClick();
       selectedNode.value = undefined;
       selectedFocusId.value = '';
       stopLocatedFlash();
@@ -263,6 +285,17 @@ export function useEnterpriseGraph() {
         clearHover();
       }
     });
+  }
+
+  function clearPendingNodeClick() {
+    if (!nodeClickTimer) return;
+    window.clearTimeout(nodeClickTimer);
+    nodeClickTimer = 0;
+  }
+
+  function clearFocusVisualState() {
+    selectedFocusId.value = '';
+    if (graph) resetGraphVisualState();
   }
 
   function mountGraphWhenReady(retryCount = 0) {
@@ -652,6 +685,7 @@ export function useEnterpriseGraph() {
         hot: related,
         dim: !related,
         opacity: related ? 0.96 : 0.14,
+        labelOpacity: graphMode.value === 'select' && !related ? 1 : undefined,
       });
     });
     graph.getEdges().forEach((item) => {
@@ -828,6 +862,7 @@ export function useEnterpriseGraph() {
   // 切换互斥模式，并同步清理会冲突的临时视觉状态。
   function setGraphMode(mode) {
     if (graphMode.value === mode) return;
+    clearPendingNodeClick();
     const wasMultiMode = graphMode.value === 'multi';
     graphMode.value = mode;
     if (mode === 'multi') {
@@ -980,24 +1015,44 @@ export function useEnterpriseGraph() {
 
   // 右侧工具栏动作：布局、展开收起、关系文字开关。
   function relayout() {
+    const contextId = getActiveSearchContextId();
     layoutCache.clear();
+    ensureSearchContextSelection(contextId);
     renderGraph();
-    window.setTimeout(() => fitFullGraphView(), 180);
+    window.setTimeout(() => {
+      if (contextId) fitVisibleSearchContextView(contextId);
+      else fitFullGraphView();
+    }, 180);
   }
 
   function expandAll() {
-    searchFocusActive.value = false;
+    const contextId = getActiveSearchContextId();
+    if (contextId) {
+      layoutCache.clear();
+      manager.expandContext(contextId);
+      ensureSearchContextSelection(contextId);
+      renderGraph(contextId);
+      window.requestAnimationFrame(() => fitVisibleSearchContextView(contextId));
+      return;
+    }
+    graphViewMode.value = 'fullGraph';
+    searchContextId.value = '';
     manager.expandAll();
     renderGraph(selectedNode.value?.id);
     window.requestAnimationFrame(() => fitFullGraphView());
   }
 
   function collapseAll() {
-    searchFocusActive.value = false;
+    const contextId = getActiveSearchContextId();
+    if (!contextId) {
+      graphViewMode.value = 'fullGraph';
+      searchContextId.value = '';
+    }
     manager.collapseAll();
     pruneInvisibleMultiSelection();
     layoutCache.clear();
     selectedNode.value = manager.getVisibleGraph().nodes[0];
+    clearFocusVisualState();
     renderGraph(selectedNode.value?.id);
     window.requestAnimationFrame(() => focusRootStartView());
   }
@@ -1020,7 +1075,11 @@ export function useEnterpriseGraph() {
   }
 
   function selectSearchResult(target) {
-    searchFocusActive.value = true;
+    clearPendingNodeClick();
+    graphViewMode.value = 'searchGraph';
+    searchContextId.value = target.id;
+    layoutCache.clear();
+    stopLocatedFlash();
     manager.focusContext(target.id);
     selectedNode.value = manager.getNode(target.id);
     selectedFocusId.value = target.id;
@@ -1031,13 +1090,33 @@ export function useEnterpriseGraph() {
   }
 
   function restoreFullGraph() {
-    searchFocusActive.value = false;
+    graphViewMode.value = 'fullGraph';
+    searchContextId.value = '';
     searchResults.value = [];
     selectedFocusId.value = '';
     stopLocatedFlash();
     manager.expandAll();
     renderGraph(selectedNode.value?.id);
     window.requestAnimationFrame(() => fitFullGraphView());
+  }
+
+  // 当前是否仍处于搜索局部关系视图。
+  function getActiveSearchContextId() {
+    if (graphViewMode.value !== 'searchGraph' || !searchContextId.value) return '';
+    return manager?.getNode(searchContextId.value) ? searchContextId.value : '';
+  }
+
+  // 搜索局部操作后只校正详情节点，不强制制造视觉聚焦。
+  function ensureSearchContextSelection(contextId) {
+    if (!contextId) return;
+    if (!manager.isVisible(selectedNode.value?.id)) selectedNode.value = manager.getNode(contextId);
+    if (selectedFocusId.value && !manager.isVisible(selectedFocusId.value)) selectedFocusId.value = '';
+  }
+
+  // 搜索局部关系视图只适配当前可见节点，不恢复全量图谱。
+  function fitVisibleSearchContextView(contextId) {
+    const visibleIds = new Set(manager.getVisibleGraph().nodes.map((node) => node.id));
+    fitContextView(visibleIds, manager.isVisible(contextId) ? contextId : '');
   }
 
   function stopLocatedFlash() {
