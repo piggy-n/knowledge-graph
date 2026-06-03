@@ -8,6 +8,13 @@ defineProps({
 });
 
 const emit = defineEmits(['container-change', 'shell-change', 'toggle-fullscreen', 'zoom', 'mode-change']);
+const toolbarTooltipProps = {
+  placement: 'left',
+  showAfter: 0,
+  hideAfter: 0,
+  transition: '',
+  enterable: false,
+};
 
 // 回传 G6 容器 DOM，避免页面层直接承载画布实现。
 function setContainerRef(element) {
@@ -31,7 +38,7 @@ function setShellRef(element) {
   >
     <div :ref="setContainerRef" class="kg-canvas"></div>
     <nav class="kg-graph-ops-toolbar" aria-label="图谱操作工具栏">
-      <ElTooltip content="全屏" placement="left">
+      <ElTooltip v-bind="toolbarTooltipProps" content="全屏">
         <button
           type="button"
           class="kg-graph-op-button"
@@ -42,18 +49,18 @@ function setShellRef(element) {
           <ElIcon><FullScreen /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="放大" placement="left">
+      <ElTooltip v-bind="toolbarTooltipProps" content="放大">
         <button type="button" class="kg-graph-op-button" aria-label="放大" @click="emit('zoom', 1.16)">
           <ElIcon><ZoomIn /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="缩小" placement="left">
+      <ElTooltip v-bind="toolbarTooltipProps" content="缩小">
         <button type="button" class="kg-graph-op-button" aria-label="缩小" @click="emit('zoom', 0.86)">
           <ElIcon><ZoomOut /></ElIcon>
         </button>
       </ElTooltip>
       <span class="kg-graph-op-divider"></span>
-      <ElTooltip content="选择模式" placement="left">
+      <ElTooltip v-bind="toolbarTooltipProps" content="选择模式">
         <button
           type="button"
           class="kg-graph-op-button"
@@ -64,7 +71,7 @@ function setShellRef(element) {
           <ElIcon><Pointer /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="漫游模式" placement="left">
+      <ElTooltip v-bind="toolbarTooltipProps" content="漫游模式">
         <button
           type="button"
           class="kg-graph-op-button"
@@ -75,7 +82,7 @@ function setShellRef(element) {
           <ElIcon><Mouse /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="多选模式" placement="left">
+      <ElTooltip v-bind="toolbarTooltipProps" content="多选模式">
         <button
           type="button"
           class="kg-graph-op-button"

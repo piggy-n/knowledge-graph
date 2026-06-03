@@ -151,7 +151,26 @@ export function useEnterpriseGraph() {
       height: graphHeight,
       animate: true,
       modes: {
-        default: ['drag-canvas', 'zoom-canvas', 'drag-node'],
+        default: [
+          {
+            type: 'drag-canvas',
+            allowDragOnItem: { node: true, edge: false, combo: false },
+            shouldBegin: (event) => {
+              const id = event.item?.getModel()?.id;
+              if (!id) return true;
+              return isFocusLimitedMode() && !canUseFocusedContextNode(id);
+            },
+          },
+          'zoom-canvas',
+          {
+            type: 'drag-node',
+            shouldBegin: (event) => {
+              if (!['roam', 'multi'].includes(graphMode.value)) return true;
+              const id = event.item?.getModel()?.id;
+              return !id || canUseFocusedContextNode(id);
+            },
+          },
+        ],
       },
       defaultNode: {
         type: 'circle',
@@ -188,7 +207,13 @@ export function useEnterpriseGraph() {
       const id = event.item?.getModel()?.id;
       if (!id) return;
       if (graphMode.value === 'multi') {
+        if (!canUseFocusedContextNode(id)) return;
         toggleMultiNode(id);
+        return;
+      }
+      if (graphMode.value === 'roam') {
+        if (!canUseFocusedContextNode(id)) return;
+        selectedNode.value = manager.getNode(id);
         return;
       }
       if (graphMode.value !== 'select') return;
@@ -208,7 +233,7 @@ export function useEnterpriseGraph() {
     });
 
     graph.on('canvas:click', () => {
-      if (graphMode.value === 'multi') return;
+      if (graphMode.value !== 'select') return;
       selectedNode.value = undefined;
       selectedFocusId.value = '';
       stopLocatedFlash();
@@ -576,6 +601,13 @@ export function useEnterpriseGraph() {
     });
   }
 
+  // 聚焦存在时，只允许当前聚焦上下文内节点参与漫游查看、多选和拖动。
+  function canUseFocusedContextNode(id) {
+    if (!selectedFocusId.value) return true;
+    if (!manager?.isVisible(selectedFocusId.value)) return false;
+    return manager.getConnectedIds(selectedFocusId.value).has(id);
+  }
+
   function applyNodeFocus(id, options = {}) {
     const relatedIds = manager.getConnectedIds(id);
     const relatedEdgeIds = manager.getContextEdgeIds(id);
@@ -655,14 +687,19 @@ export function useEnterpriseGraph() {
     const labelStyle = model.labelCfg?.originStyle || model.labelCfg?.style || {};
     const lineWidth = Number(baseStyle.lineWidth || 2);
     const multiSelected = selectedMultiNodeIds.value.has(model.id);
+    const disabledByFocusMode = isFocusLimitedMode() && !canUseFocusedContextNode(model.id);
+    const cursor = disabledByFocusMode ? 'default' : baseStyle.cursor || 'pointer';
+    setNodeEventCapture(item, !disabledByFocusMode);
     const style = {
       ...baseStyle,
+      cursor,
       opacity: options.opacity ?? (options.dim ? 0.14 : baseStyle.opacity ?? 0.92),
     };
     const labelCfg = {
       ...model.labelCfg,
       style: {
         ...labelStyle,
+        cursor,
         opacity: options.labelHidden ? 0 : options.dim ? 0.18 : 1,
       },
     };
@@ -688,6 +725,18 @@ export function useEnterpriseGraph() {
     }
 
     graph.updateItem(item, { style, labelCfg });
+  }
+
+  function setNodeEventCapture(item, enabled) {
+    const container = item.getContainer?.();
+    container?.set?.('capture', enabled);
+    container?.get?.('children')?.forEach((shape) => {
+      shape.set?.('capture', enabled);
+    });
+  }
+
+  function isFocusLimitedMode() {
+    return Boolean(selectedFocusId.value && ['roam', 'multi'].includes(graphMode.value));
   }
 
   // 左侧图例交互只影响可视状态，不改动业务数据。
@@ -772,9 +821,8 @@ export function useEnterpriseGraph() {
     const wasMultiMode = graphMode.value === 'multi';
     graphMode.value = mode;
     if (mode === 'multi') {
-      selectedFocusId.value = '';
       stopLocatedFlash();
-      resetGraphVisualState();
+      refreshCurrentVisualState();
       return;
     }
     if (wasMultiMode) clearMultiSelection();
