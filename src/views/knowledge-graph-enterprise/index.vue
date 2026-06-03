@@ -18,6 +18,7 @@ const searchResults = ref([]);
 const searchKeyword = ref('');
 const searchFocusActive = ref(false);
 const locatedNodeId = ref('');
+const selectedFocusId = ref('');
 const overviewItems = ref([]);
 const activeLegendId = ref('');
 const hoveredLegendId = ref('');
@@ -106,6 +107,7 @@ function initGraph() {
           fontSize: 10,
           fontWeight: 600,
           lineHeight: 12,
+          cursor: 'pointer',
         },
       },
     },
@@ -122,7 +124,7 @@ function initGraph() {
     },
     edgeStateStyles: {
       inactive: {
-        opacity: 0.1,
+        opacity: 0.05,
       },
     },
   });
@@ -131,7 +133,8 @@ function initGraph() {
     const id = event.item?.getModel()?.id;
     if (!id) return;
     selectedNode.value = manager.getNode(id);
-    applyHover(id);
+    selectedFocusId.value = id;
+    applySelectedFocus();
   });
 
   graph.on('node:dblclick', (event) => {
@@ -139,12 +142,15 @@ function initGraph() {
     if (!id) return;
     manager.toggle(id);
     selectedNode.value = manager.getNode(id);
+    selectedFocusId.value = id;
     renderGraph(id);
   });
 
   graph.on('canvas:click', () => {
     selectedNode.value = undefined;
-    clearHover();
+    selectedFocusId.value = '';
+    stopLocatedFlash();
+    resetGraphVisualState();
   });
 
   graph.on('node:mouseenter', (event) => {
@@ -199,8 +205,9 @@ function renderGraph() {
   graph.getNodes().forEach((item) => graph.clearItemStates(item));
   graph.getEdges().forEach((item) => graph.clearItemStates(item));
 
-  applyLocatedState();
   applyLegendState();
+  applySelectedFocus();
+  applyLocatedState();
 }
 
 function toG6Data() {
@@ -247,6 +254,7 @@ function toG6Data() {
             lineHeight: textSpec.lineHeight,
             textAlign: 'center',
             textBaseline: 'middle',
+            cursor: 'pointer',
           },
           style: {
             fill: '#ffffff',
@@ -480,15 +488,39 @@ function updateEdgeVisual(item, active = false) {
 }
 
 function applyHover(id) {
+  applyNodeFocus(id, {
+    dimOpacity: 0.08,
+    relatedOpacity: 0.96,
+    hideDimLabels: true,
+  });
+}
+
+function applySelectedFocus() {
+  if (!selectedFocusId.value || !manager?.isVisible(selectedFocusId.value)) {
+    selectedFocusId.value = '';
+    return;
+  }
+
+  applyNodeFocus(selectedFocusId.value, {
+    dimOpacity: 0.06,
+    relatedOpacity: 0.98,
+    hideDimLabels: true,
+  });
+}
+
+function applyNodeFocus(id, options = {}) {
   const relatedIds = manager.getConnectedIds(id);
   const relatedEdgeIds = manager.getContextEdgeIds(id);
+  const dimOpacity = options.dimOpacity ?? 0.08;
+  const relatedOpacity = options.relatedOpacity ?? 0.96;
   graph.getNodes().forEach((item) => {
     const itemId = item.getModel().id;
     const related = relatedIds.has(itemId);
     updateNodeVisual(item, {
       hot: itemId === id,
       dim: itemId !== id && !related,
-      opacity: itemId === id ? 1 : related ? 0.96 : 0.14,
+      opacity: itemId === id ? 1 : related ? relatedOpacity : dimOpacity,
+      labelHidden: options.hideDimLabels && itemId !== id && !related,
     });
   });
   graph.getEdges().forEach((item) => {
@@ -520,6 +552,17 @@ function applyEdgeHover(edgeItem) {
 }
 
 function clearHover() {
+  if (selectedFocusId.value) {
+    applyLegendState();
+    applySelectedFocus();
+    applyLocatedState();
+    return;
+  }
+
+  resetGraphVisualState();
+}
+
+function resetGraphVisualState() {
   graph.getNodes().forEach((item) => {
     updateNodeVisual(item);
   });
@@ -533,22 +576,26 @@ function clearHover() {
 
 function applyLocatedState() {
   if (!graph) return;
-  graph.getNodes().forEach((item) => {
-    const itemId = item.getModel().id;
-    updateNodeVisual(item, { hot: itemId === locatedNodeId.value });
-  });
-  graph.getEdges().forEach((item) => {
-    graph.setItemState(item, 'inactive', false);
-  });
+  if (!locatedNodeId.value) return;
+  const item = graph.findById(locatedNodeId.value);
+  if (item) updateNodeVisual(item, { hot: true, opacity: 1 });
 }
 
 function updateNodeVisual(item, options = {}) {
   const model = item.getModel();
   const baseStyle = model.originStyle || model.style || {};
+  const labelStyle = model.labelCfg?.originStyle || model.labelCfg?.style || {};
   const lineWidth = Number(baseStyle.lineWidth || 2);
   const style = {
     ...baseStyle,
     opacity: options.opacity ?? (options.dim ? 0.14 : baseStyle.opacity ?? 0.92),
+  };
+  const labelCfg = {
+    ...model.labelCfg,
+    style: {
+      ...labelStyle,
+      opacity: options.labelHidden ? 0 : options.dim ? 0.18 : 1,
+    },
   };
 
   if (options.hot) {
@@ -561,7 +608,7 @@ function updateNodeVisual(item, options = {}) {
     });
   }
 
-  graph.updateItem(item, { style });
+  graph.updateItem(item, { style, labelCfg });
 }
 
 function setLegendHover(id) {
@@ -707,6 +754,7 @@ function selectSearchResult(target) {
   searchFocusActive.value = true;
   manager.focusContext(target.id);
   selectedNode.value = manager.getNode(target.id);
+  selectedFocusId.value = target.id;
   renderGraph(target.id);
   const contextIds = manager.getConnectedIds(target.id);
   window.setTimeout(() => fitContextView(contextIds, target.id), 180);
@@ -716,9 +764,19 @@ function selectSearchResult(target) {
 function restoreFullGraph() {
   searchFocusActive.value = false;
   searchResults.value = [];
+  selectedFocusId.value = '';
+  stopLocatedFlash();
   manager.expandAll();
   renderGraph(selectedNode.value?.id);
   window.requestAnimationFrame(() => fitFullGraphView());
+}
+
+function stopLocatedFlash() {
+  if (locateTimer) window.clearTimeout(locateTimer);
+  if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
+  locateTimer = 0;
+  locateBlinkTimer = 0;
+  locatedNodeId.value = '';
 }
 
 function flashLocatedNode(id) {
@@ -737,14 +795,16 @@ function flashLocatedNode(id) {
       if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
       locateBlinkTimer = 0;
       locatedNodeId.value = '';
-      applyLocatedState();
+      if (selectedFocusId.value) applySelectedFocus();
+      else resetGraphVisualState();
     }
   }, 320);
   locateTimer = window.setTimeout(() => {
     if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
     locateBlinkTimer = 0;
     locatedNodeId.value = '';
-    applyLocatedState();
+    if (selectedFocusId.value) applySelectedFocus();
+    else resetGraphVisualState();
   }, 2800);
 }
 
