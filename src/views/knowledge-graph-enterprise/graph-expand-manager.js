@@ -38,10 +38,6 @@ export class GraphExpandManager {
     };
   }
 
-  getAllNodes() {
-    return [...this.dataset.nodeMap.values()];
-  }
-
   getChildren(id) {
     // 子节点统一通过 childrenMap 读取，供详情面板和图谱逻辑复用。
     return (this.dataset.childrenMap.get(id) || [])
@@ -84,10 +80,6 @@ export class GraphExpandManager {
 
   isVisible(id) {
     return this.visibleIds.has(id);
-  }
-
-  isExpanded(id) {
-    return this.expandedIds.has(id);
   }
 
   toggle(id) {
@@ -155,15 +147,6 @@ export class GraphExpandManager {
     this.visibleIds.clear();
     this.expandedIds.clear();
     if (this.dataset.rootId) this.visibleIds.add(this.dataset.rootId);
-  }
-
-  revealNode(id) {
-    // 搜索定位前补齐目标节点到根节点的可见路径。
-    const path = this.getPathToRoot(id);
-    path.forEach((nodeId) => this.visibleIds.add(nodeId));
-    path.slice(0, -1).forEach((nodeId) => {
-      if (this.hasChildren(nodeId)) this.expandedIds.add(nodeId);
-    });
   }
 
   focusContext(id) {
