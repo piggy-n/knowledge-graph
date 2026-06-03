@@ -187,8 +187,6 @@ watch(
             </div>
           </div>
         </div>
-
-        <div v-if="activeLegendLabel" class="kg-legend-hint">已筛选：{{ activeLegendLabel }}</div>
       </div>
     </section>
   </aside>
@@ -230,15 +228,17 @@ watch(
 }
 
 .kg-left-panel--detail {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .kg-left-panel--overview {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-height: calc((100% - (var(--kg-left-gap) * 2)) / 3);
 }
 
 .kg-left-panel--legend {
-  flex: 0 0 calc((100% - (var(--kg-left-gap) * 2)) / 3);
+  flex: 0 1 auto;
   max-height: calc((100% - (var(--kg-left-gap) * 2)) / 3);
 }
 
@@ -277,7 +277,7 @@ watch(
 }
 
 .kg-left-panel__content {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   padding: 10px var(--kg-panel-padding-x);
   overflow-y: auto;
@@ -301,8 +301,15 @@ watch(
 }
 
 .kg-left-panel--overview .kg-left-panel__content {
-  flex: 0 0 auto;
-  overflow: visible;
+  flex: 0 1 auto;
+}
+
+.kg-left-panel--detail .kg-left-panel__content {
+  flex: 1 1 0;
+}
+
+.kg-left-panel--legend .kg-left-panel__content {
+  flex: 0 1 auto;
 }
 
 .kg-detail-section {
@@ -371,7 +378,7 @@ watch(
 
 .kg-child-table-shell {
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
@@ -408,10 +415,10 @@ watch(
 
 :deep(.kg-child-table.el-table) {
   --el-table-border-color: transparent;
-  --el-table-header-bg-color: #f8fafc;
+  --el-table-header-bg-color: #eef4fb;
   --el-table-row-hover-bg-color: rgba(239, 246, 255, 0.65);
   --el-table-text-color: #1e293b;
-  --el-table-header-text-color: #64748b;
+  --el-table-header-text-color: #334155;
   border: 0;
   border-radius: 8px;
 }
@@ -423,6 +430,7 @@ watch(
 :deep(.kg-child-table .el-table__header-wrapper) {
   overflow: hidden;
   border-radius: 8px 8px 0 0;
+  background: #eef4fb;
 }
 
 :deep(.kg-child-table .el-table__inner-wrapper::before),
@@ -433,13 +441,13 @@ watch(
 }
 
 :deep(.kg-child-table th.el-table__cell) {
-  height: 34px;
-  padding: 2px 0;
-  background: #f8fafc;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 500;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  height: 38px;
+  padding: 5px 0;
+  background: #eef4fb;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 :deep(.kg-child-table .el-table__cell) {
@@ -453,10 +461,14 @@ watch(
 }
 
 :deep(.kg-child-table .cell) {
-  padding: 0 9px;
+  padding: 0 10px;
   line-height: 1.45;
   white-space: normal;
   word-break: break-word;
+}
+
+:deep(.kg-child-table th.el-table__cell .cell) {
+  line-height: 1.4;
 }
 
 :deep(.kg-child-pager .el-pagination) {
