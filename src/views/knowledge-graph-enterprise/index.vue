@@ -640,14 +640,20 @@ function fitContextView(contextIds, focusId) {
     return;
   }
 
-  graph.fitView(72);
-  if (focusId) {
+  if (items.length === 1 && focusId) {
     const focusItem = graph.findById(focusId);
+    graph.zoomTo(1.12);
     if (focusItem) graph.focusItem(focusItem, true);
+    return;
   }
+
+  graph.fitView(58);
   const zoom = graph.getZoom ? graph.getZoom() : 1;
-  if (zoom < 0.62) graph.zoomTo(0.62);
-  if (zoom > 1.28) graph.zoomTo(1.28);
+  const minZoom = items.length <= 6 ? 0.9 : items.length <= 12 ? 0.78 : 0.68;
+  const maxZoom = items.length <= 6 ? 1.18 : 1.08;
+  if (zoom < minZoom) graph.zoomTo(minZoom);
+  if (zoom > maxZoom) graph.zoomTo(maxZoom);
+  graph.fitCenter();
 }
 
 function focusRootStartView() {
@@ -727,7 +733,7 @@ function flashLocatedNode(id) {
     blinkCount += 1;
     const current = graph?.findById(id);
     if (current) updateNodeVisual(current, { hot: visible, opacity: 1 });
-    if (blinkCount >= 6) {
+    if (blinkCount >= 8) {
       if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
       locateBlinkTimer = 0;
       locatedNodeId.value = '';
@@ -739,7 +745,7 @@ function flashLocatedNode(id) {
     locateBlinkTimer = 0;
     locatedNodeId.value = '';
     applyLocatedState();
-  }, 2100);
+  }, 2800);
 }
 
 function searchResultPath(node) {
