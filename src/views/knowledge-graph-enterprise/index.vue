@@ -805,42 +805,4 @@ function searchResultSystem(node) {
   contain: layout paint size;
 }
 
-:deep(.kg-enterprise-panel) {
-  position: static;
-  width: auto;
-  margin: 0;
-  border-radius: 10px;
-  border-color: rgba(37, 99, 235, 0.12);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.08);
-}
-
-:deep(.kg-enterprise-panel-header) {
-  height: 36px;
-  padding: 0 14px;
-  cursor: default;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-  justify-content: flex-start;
-}
-
-:deep(.kg-enterprise-card-title) {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  padding-left: 10px;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-:deep(.kg-enterprise-card-title::before) {
-  position: absolute;
-  left: 0;
-  width: 3px;
-  height: 14px;
-  border-radius: 999px;
-  background: #2563eb;
-  content: '';
-}
 </style>

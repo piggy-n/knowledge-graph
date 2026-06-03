@@ -16,7 +16,7 @@ const props = defineProps({
 const emit = defineEmits(['legend-hover', 'legend-toggle']);
 
 const childPage = ref(1);
-const childPageSize = 10;
+const childPageSize = 5;
 
 const rows = computed(() => {
   const node = props.node;
@@ -29,9 +29,16 @@ const rows = computed(() => {
               ? '国土空间用地用海分类'
               : node.system;
 
+  const isCategoryNode = ['一级类', '二级类', '三级类'].includes(node.levelName);
+  const identityRows = isCategoryNode
+      ? [['分类标识', formatNodeName(node)]]
+      : [
+          ['节点编码', node.code],
+          ['分类名称', node.name || node.label],
+        ];
+
   return [
-    ['节点编码', node.code],
-    ['分类名称', node.name || node.label],
+    ...identityRows,
     ['分类体系', systemLabel],
     ['层级', node.levelName],
     ['父级分类', node.parentLabel],
@@ -54,132 +61,134 @@ watch(
 
 <template>
   <aside class="kg-enterprise-left">
-    <section class="kg-enterprise-panel kg-detail">
-      <div class="kg-enterprise-panel-header">
-        <span class="kg-enterprise-card-title">节点详情</span>
-      </div>
+    <section class="kg-left-panel kg-left-panel--detail">
+      <header class="kg-left-panel__header">
+        <h2 class="kg-left-panel__title">节点详情</h2>
+      </header>
 
-      <div v-if="node" class="kg-detail__body">
-        <div class="kg-detail-summary">
-          <div class="kg-detail-summary__name">
-            {{ formatNodeName(node) }}
-          </div>
-        </div>
+      <div class="kg-left-panel__content kg-detail-content">
+        <template v-if="node">
+          <section class="kg-detail-section">
+            <div class="kg-detail-subtitle">
+              <span>基础信息</span>
+            </div>
 
-        <div class="kg-detail-info">
-          <div v-for="[label, value] in rows" :key="label" class="kg-detail-info__row">
-            <span class="kg-detail-info__label">{{ label }}</span>
-            <span class="kg-detail-info__value">{{ value }}</span>
-          </div>
-        </div>
+            <dl class="kg-detail-fields">
+              <div v-for="[label, value] in rows" :key="label" class="kg-detail-field">
+                <dt>{{ label }}</dt>
+                <dd>{{ value }}</dd>
+              </div>
+            </dl>
+          </section>
 
-        <section v-if="children.length" class="kg-detail-children">
-          <div class="kg-detail-children__header">
-            <span>下级分类</span>
-            <strong>{{ children.length }} 项</strong>
-          </div>
+          <section v-if="children.length" class="kg-child-section">
+            <div class="kg-detail-subtitle">
+              <span>下级分类</span>
+              <em>{{ children.length }} 项</em>
+            </div>
 
-          <ElTable
-              :data="pagedChildren"
-              class="kg-detail-children-table"
-              size="small"
-              border
-              :show-header="true"
-          >
-            <ElTableColumn label="分类名称" min-width="170">
-              <template #default="{ row }">
-                <span class="kg-detail-children__name">
-                  {{ formatNodeName(row) }}
-                </span>
-              </template>
-            </ElTableColumn>
+            <div class="kg-child-table-shell">
+              <ElTable
+                :data="pagedChildren"
+                class="kg-child-table"
+                size="small"
+                :show-header="true"
+              >
+                <ElTableColumn label="分类名称" min-width="178">
+                  <template #default="{ row }">
+                    <span class="kg-child-name">{{ formatNodeName(row) }}</span>
+                  </template>
+                </ElTableColumn>
 
-            <ElTableColumn label="层级" width="78">
-              <template #default="{ row }">
-                <span class="kg-detail-children__level">
-                  {{ row.levelName || '分类节点' }}
-                </span>
-              </template>
-            </ElTableColumn>
-          </ElTable>
+                <ElTableColumn label="层级" width="72">
+                  <template #default="{ row }">
+                    <span class="kg-child-level">{{ row.levelName || '分类节点' }}</span>
+                  </template>
+                </ElTableColumn>
+              </ElTable>
+            </div>
 
-          <div class="kg-detail-children__pager">
-            <ElPagination
+            <div v-if="children.length > childPageSize" class="kg-child-pager">
+              <ElPagination
                 v-model:current-page="childPage"
                 small
-                background
                 layout="prev, pager, next"
                 :page-size="childPageSize"
                 :total="children.length"
                 :pager-count="5"
-            />
+              />
+            </div>
+          </section>
+        </template>
+
+        <div v-else class="kg-detail-empty">
+          <ElEmpty description="请选择图谱节点查看详情" :image-size="64" />
+        </div>
+      </div>
+    </section>
+
+    <section class="kg-left-panel kg-left-panel--overview">
+      <header class="kg-left-panel__header">
+        <h2 class="kg-left-panel__title">数据概览</h2>
+      </header>
+
+      <div class="kg-left-panel__content">
+        <div class="kg-overview-grid">
+          <dl v-for="[label, value] in overviewItems" :key="label" class="kg-overview-card">
+            <dt>{{ label }}</dt>
+            <dd>{{ value }}</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="kg-left-panel kg-left-panel--legend">
+      <header class="kg-left-panel__header">
+        <h2 class="kg-left-panel__title">图例说明</h2>
+      </header>
+
+      <div class="kg-left-panel__content">
+        <div class="kg-legend-columns">
+          <div class="kg-legend-block">
+            <h3>节点类别</h3>
+            <div class="kg-legend-list">
+              <button
+                v-for="item in nodeLegendItems"
+                :key="item.id"
+                type="button"
+                class="kg-legend-chip"
+                :class="{ 'is-active': activeLegendId === item.id }"
+                @mouseenter="emit('legend-hover', item.id)"
+                @mouseleave="emit('legend-hover', '')"
+                @click="emit('legend-toggle', item.id)"
+              >
+                <span class="kg-legend-swatch" :style="{ backgroundColor: item.color }"></span>
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
           </div>
-        </section>
-      </div>
 
-      <div v-else class="kg-detail-empty">
-        <ElEmpty description="请选择图谱节点查看详情" :image-size="64" />
-      </div>
-    </section>
-
-    <section class="kg-enterprise-panel kg-overview">
-      <div class="kg-enterprise-panel-header">
-        <span class="kg-enterprise-card-title">数据概览</span>
-      </div>
-
-      <div class="kg-overview__body">
-        <dl v-for="[label, value] in overviewItems" :key="label" class="kg-overview__item">
-          <dt>{{ label }}</dt>
-          <dd>{{ value }}</dd>
-        </dl>
-      </div>
-    </section>
-
-    <section class="kg-enterprise-panel kg-legend">
-      <div class="kg-enterprise-panel-header">
-        <span class="kg-enterprise-card-title">图例说明</span>
-      </div>
-
-      <div class="kg-legend__body">
-        <div class="kg-legend__section">
-          <h3>节点类别</h3>
-
-          <button
-              v-for="item in nodeLegendItems"
-              :key="item.id"
-              type="button"
-              class="kg-legend__item"
-              :class="{ 'is-active': activeLegendId === item.id }"
-              @mouseenter="emit('legend-hover', item.id)"
-              @mouseleave="emit('legend-hover', '')"
-              @click="emit('legend-toggle', item.id)"
-          >
-            <span class="kg-legend__swatch" :style="{ backgroundColor: item.color }"></span>
-            <span class="kg-legend__text">{{ item.label }}</span>
-          </button>
+          <div class="kg-legend-block">
+            <h3>关系类型</h3>
+            <div class="kg-legend-list">
+              <button
+                v-for="item in relationLegendItems"
+                :key="item.id"
+                type="button"
+                class="kg-legend-chip"
+              >
+                <span
+                  class="kg-legend-line"
+                  :class="{ 'kg-legend-line--dashed': item.lineType === 'dashed' }"
+                  :style="{ borderColor: item.color, borderWidth: `${item.lineWidth || 2}px` }"
+                ></span>
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="kg-legend__section">
-          <h3>关系类型</h3>
-
-          <button
-              v-for="item in relationLegendItems"
-              :key="item.id"
-              type="button"
-              class="kg-legend__item kg-legend__item--line"
-          >
-            <span
-                class="kg-legend__line"
-                :class="{ 'kg-legend__line--dashed': item.lineType === 'dashed' }"
-                :style="{ borderColor: item.color, borderWidth: `${item.lineWidth || 2}px` }"
-            ></span>
-            <span class="kg-legend__text">{{ item.label }}</span>
-          </button>
-        </div>
-
-        <div v-if="activeLegendLabel" class="kg-legend__hint">
-          已筛选：{{ activeLegendLabel }}
-        </div>
+        <div v-if="activeLegendLabel" class="kg-legend-hint">已筛选：{{ activeLegendLabel }}</div>
       </div>
     </section>
   </aside>
@@ -187,7 +196,12 @@ watch(
 
 <style scoped>
 .kg-enterprise-left {
+  --kg-left-gap: 12px;
   --kg-panel-padding-x: 14px;
+  --kg-title-blue: #2563eb;
+  --kg-border: rgba(148, 163, 184, 0.2);
+  --kg-muted: #64748b;
+  --kg-text: #0f172a;
 
   display: flex;
   flex: 0 0 320px;
@@ -195,7 +209,7 @@ watch(
   width: 320px;
   height: 100%;
   min-height: 0;
-  gap: 12px;
+  gap: var(--kg-left-gap);
   padding: 14px;
   overflow: hidden;
   background: rgba(248, 250, 252, 0.96);
@@ -203,164 +217,174 @@ watch(
   box-sizing: border-box;
 }
 
-.kg-enterprise-panel {
+.kg-left-panel {
   display: flex;
-  flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--kg-border);
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
   box-sizing: border-box;
 }
 
-.kg-enterprise-panel-header {
+.kg-left-panel--detail {
+  flex: 1 1 auto;
+}
+
+.kg-left-panel--overview {
+  flex: 0 0 auto;
+}
+
+.kg-left-panel--legend {
+  flex: 0 0 calc((100% - (var(--kg-left-gap) * 2)) / 3);
+  max-height: calc((100% - (var(--kg-left-gap) * 2)) / 3);
+}
+
+.kg-left-panel__header {
   display: flex;
   flex: 0 0 38px;
   align-items: center;
-  justify-content: flex-start;
   height: 38px;
   padding: 0 var(--kg-panel-padding-x);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   box-sizing: border-box;
 }
 
-.kg-enterprise-card-title {
+.kg-left-panel__title {
   position: relative;
   display: inline-flex;
   align-items: center;
   margin: 0;
   padding-left: 10px;
-  color: #0f172a;
+  color: var(--kg-text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
-  white-space: nowrap;
 }
 
-.kg-enterprise-card-title::before {
+.kg-left-panel__title::before {
   position: absolute;
   top: 50%;
   left: 0;
   width: 3px;
   height: 14px;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--kg-title-blue);
   transform: translateY(-50%);
   content: '';
 }
 
-/* 节点详情 */
-
-.kg-detail__body {
+.kg-left-panel__content {
   flex: 1;
   min-height: 0;
-  padding: 12px var(--kg-panel-padding-x);
+  padding: 10px var(--kg-panel-padding-x);
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
+  color: var(--kg-text);
+  font-size: 12px;
 }
 
-.kg-detail__body::-webkit-scrollbar {
-  width: 6px;
+.kg-left-panel__content::-webkit-scrollbar {
+  width: 5px;
 }
 
-.kg-detail__body::-webkit-scrollbar-thumb {
+.kg-left-panel__content::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.3);
 }
 
-.kg-detail__body::-webkit-scrollbar-track {
+.kg-left-panel__content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.kg-detail-summary {
-  padding: 10px 12px;
-  margin-bottom: 10px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.9), rgba(248, 250, 252, 0.9));
-  box-sizing: border-box;
+.kg-left-panel--overview .kg-left-panel__content {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
-.kg-detail-summary__name {
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.45;
-  word-break: break-word;
-  white-space: normal;
-}
-
-.kg-detail-info {
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-.kg-detail-info__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 24px;
-  padding: 4px 0;
-  box-sizing: border-box;
-}
-
-.kg-detail-info__label {
-  flex: 0 0 66px;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.5;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.kg-detail-info__value {
-  flex: 1;
+.kg-detail-section {
   min-width: 0;
-  color: #1e293b;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.5;
-  text-align: left;
-  word-break: break-word;
-  white-space: normal;
 }
 
-.kg-detail-children {
-  padding-top: 10px;
-}
-
-.kg-detail-children__header {
+.kg-detail-subtitle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 26px;
-  margin-bottom: 8px;
+  min-height: 24px;
+  margin-bottom: 7px;
   color: #334155;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.4;
 }
 
-.kg-detail-children__header strong {
-  color: #2563eb;
+.kg-detail-subtitle span {
+  min-width: 0;
+}
+
+.kg-detail-subtitle em {
+  color: var(--kg-title-blue);
   font-size: 12px;
+  font-style: normal;
   font-weight: 700;
 }
 
-.kg-detail-children-table {
-  width: 100%;
-  border-radius: 8px;
+.kg-detail-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+}
+
+.kg-detail-field {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.kg-detail-field dt,
+.kg-detail-field dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kg-detail-field dt {
+  color: var(--kg-muted);
+  font-weight: 500;
+}
+
+.kg-detail-field dd {
+  color: #1e293b;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.kg-child-section {
+  margin-top: 12px;
+}
+
+.kg-child-table-shell {
   overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.kg-child-table {
+  width: 100%;
   font-size: 12px;
 }
 
-.kg-detail-children__name {
+.kg-child-name {
   display: inline-block;
-  color: #0f172a;
+  color: var(--kg-text);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.45;
@@ -368,222 +392,236 @@ watch(
   word-break: break-word;
 }
 
-.kg-detail-children__level {
-  color: #64748b;
+.kg-child-level {
+  color: var(--kg-muted);
   font-size: 11px;
   line-height: 1.4;
   white-space: normal;
   word-break: break-word;
 }
 
-.kg-detail-children__pager {
+.kg-child-pager {
   display: flex;
   justify-content: flex-end;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
-:deep(.kg-detail-children__pager .el-pagination) {
-  --el-pagination-font-size: 11px;
-  --el-pagination-button-width: 22px;
-  --el-pagination-button-height: 22px;
-  --el-pagination-button-gap: 3px;
-}
-
-:deep(.kg-detail-children-table.el-table) {
-  --el-table-border-color: rgba(148, 163, 184, 0.18);
-  --el-table-header-bg-color: rgba(248, 250, 252, 0.95);
+:deep(.kg-child-table.el-table) {
+  --el-table-border-color: transparent;
+  --el-table-header-bg-color: #f8fafc;
   --el-table-row-hover-bg-color: rgba(239, 246, 255, 0.65);
   --el-table-text-color: #1e293b;
-  --el-table-header-text-color: #475569;
-  border-color: rgba(148, 163, 184, 0.18);
+  --el-table-header-text-color: #64748b;
+  border: 0;
+  border-radius: 8px;
 }
 
-:deep(.kg-detail-children-table .el-table__header-wrapper th) {
-  height: 32px;
-  padding: 0;
-  background: rgba(248, 250, 252, 0.95);
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
+:deep(.kg-child-table .el-table__inner-wrapper) {
+  border-radius: 8px;
 }
 
-:deep(.kg-detail-children-table .el-table__cell) {
-  padding: 7px 0;
+:deep(.kg-child-table .el-table__header-wrapper) {
+  overflow: hidden;
+  border-radius: 8px 8px 0 0;
+}
+
+:deep(.kg-child-table .el-table__inner-wrapper::before),
+:deep(.kg-child-table .el-table__border-left-patch),
+:deep(.kg-child-table::before),
+:deep(.kg-child-table::after) {
+  display: none;
+}
+
+:deep(.kg-child-table th.el-table__cell) {
+  height: 34px;
+  padding: 2px 0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+:deep(.kg-child-table .el-table__cell) {
+  padding: 6px 0;
+  border-bottom-color: rgba(148, 163, 184, 0.07);
   vertical-align: top;
 }
 
-:deep(.kg-detail-children-table .cell) {
+:deep(.kg-child-table .el-table__row:last-child .el-table__cell) {
+  border-bottom: 0;
+}
+
+:deep(.kg-child-table .cell) {
+  padding: 0 9px;
   line-height: 1.45;
   white-space: normal;
   word-break: break-word;
 }
 
-:deep(.kg-detail-children-table::before),
-:deep(.kg-detail-children-table::after) {
-  background-color: rgba(148, 163, 184, 0.18);
+:deep(.kg-child-pager .el-pagination) {
+  --el-pagination-font-size: 11px;
+  --el-pagination-button-width: auto;
+  --el-pagination-button-height: 22px;
+  --el-pagination-button-gap: 2px;
+  --el-pagination-hover-color: #2563eb;
+}
+
+:deep(.kg-child-pager .el-pager li),
+:deep(.kg-child-pager button) {
+  min-width: 22px;
+  padding: 0 4px;
+  color: #64748b;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+:deep(.kg-child-pager button.is-disabled) {
+  color: #cbd5e1;
+  background: transparent;
+}
+
+:deep(.kg-child-pager .el-pager li:hover),
+:deep(.kg-child-pager button:hover) {
+  color: var(--kg-title-blue);
+  background: transparent;
+}
+
+:deep(.kg-child-pager .el-pager li.is-active) {
+  color: #2563eb;
+  background: transparent;
+  font-weight: 700;
 }
 
 .kg-detail-empty {
   display: flex;
-  flex: 1;
   align-items: center;
   justify-content: center;
-  min-height: 0;
-  padding: 12px;
-  box-sizing: border-box;
+  min-height: 100%;
 }
 
-/* 数据概览 */
-
-.kg-overview__body {
+.kg-overview-grid {
   display: grid;
-  flex: 1;
-  min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  gap: 8px;
-  padding: 12px var(--kg-panel-padding-x);
-  overflow: hidden;
-  box-sizing: border-box;
+  gap: 6px 8px;
 }
 
-.kg-overview__item {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+.kg-overview-card {
   min-width: 0;
-  min-height: 40px;
-  column-gap: 8px;
+  min-height: 34px;
   margin: 0;
-  padding: 8px 10px 8px 18px;
+  padding: 6px 8px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 8px;
-  background: rgba(248, 250, 252, 0.86);
+  background: rgba(248, 250, 252, 0.88);
   box-sizing: border-box;
 }
 
-.kg-overview__item::before {
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: #60a5fa;
-  transform: translateY(-50%);
-  content: '';
+.kg-overview-card dt,
+.kg-overview-card dd {
+  margin: 0;
 }
 
-.kg-overview__item dt {
-  min-width: 0;
-  margin: 0;
-  color: #64748b;
+.kg-overview-card dt {
+  color: var(--kg-muted);
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: keep-all;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
 }
 
-.kg-overview__item dd {
-  margin: 0;
-  color: #0f172a;
-  font-size: 15px;
+.kg-overview-card dd {
+  margin-top: 3px;
+  color: var(--kg-title-blue);
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.2;
-  text-align: right;
-  white-space: nowrap;
 }
 
-/* 图例说明 */
-
-.kg-legend__body {
+.kg-legend-columns {
   display: grid;
-  flex: 1;
-  min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  column-gap: 10px;
-  row-gap: 6px;
-  padding: 10px var(--kg-panel-padding-x) 12px;
-  overflow: hidden;
-  box-sizing: border-box;
+  gap: 10px;
+  align-items: start;
 }
 
-.kg-legend__section {
+.kg-legend-block {
   min-width: 0;
 }
 
-.kg-legend__section h3 {
-  margin: 0 0 5px;
+.kg-legend-block h3 {
+  margin: 0 0 8px;
   color: #334155;
   font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
 }
 
-.kg-legend__item {
+.kg-legend-list {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  min-height: 20px;
+  flex-direction: column;
   gap: 5px;
+}
+
+.kg-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 21px;
+  gap: 6px;
   padding: 1px 2px;
-  margin: 0 0 3px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: #1f2937;
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.3;
   text-align: left;
   cursor: pointer;
-  box-sizing: border-box;
 }
 
-.kg-legend__item:hover {
-  background: rgba(241, 245, 249, 0.9);
+.kg-legend-chip:hover {
+  background: rgba(241, 245, 249, 0.92);
 }
 
-.kg-legend__item.is-active {
+.kg-legend-chip.is-active {
   border-color: rgba(37, 99, 235, 0.22);
   background: rgba(239, 246, 255, 0.95);
   color: #1d4ed8;
 }
 
-.kg-legend__swatch {
+.kg-legend-swatch {
   flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
+  width: 18px;
+  height: 8px;
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
 
-.kg-legend__line {
+.kg-legend-line {
   flex: 0 0 auto;
   width: 20px;
   height: 0;
   border-top-style: solid;
 }
 
-.kg-legend__line--dashed {
+.kg-legend-line--dashed {
   border-top-style: dashed;
 }
 
-.kg-legend__text {
+.kg-legend-chip span:last-child {
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
 }
 
-.kg-legend__hint {
-  grid-column: 1 / -1;
+.kg-legend-hint {
+  margin-top: 10px;
   padding: 6px 8px;
   border-radius: 7px;
   background: rgba(239, 246, 255, 0.85);
