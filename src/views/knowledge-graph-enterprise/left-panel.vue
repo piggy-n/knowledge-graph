@@ -78,25 +78,33 @@ watch(
         <h2 class="kg-left-panel__title">{{ multiMode ? '已选节点' : '节点详情' }}</h2>
         <div v-if="multiMode" class="kg-left-panel__header-actions">
           <ElButton
-            class="kg-left-panel__icon-button"
+            class="kg-left-panel__export-button"
             :icon="Download"
-            circle
+            type="primary"
             size="small"
-            title="下载已选节点"
             :disabled="!multiSelectedNodes.length"
             @click="emit('download-multi-selection')"
-          />
+          >
+            导出
+          </ElButton>
         </div>
       </header>
 
-      <div class="kg-left-panel__content kg-detail-content">
+      <div
+        class="kg-left-panel__content kg-detail-content"
+        :class="{
+          'kg-detail-content--multi-list': multiMode && multiSelectedCards.length,
+          'kg-detail-content--multi-empty': multiMode && !multiSelectedCards.length,
+        }"
+      >
         <template v-if="multiMode">
           <div class="kg-multi-summary">
             <span>已选 {{ multiSelectedNodes.length }} 个节点</span>
             <ElButton
               class="kg-multi-clear"
               size="small"
-              text
+              type="primary"
+              link
               :disabled="!multiSelectedNodes.length"
               @click="emit('clear-multi-selection')"
             >
@@ -346,8 +354,10 @@ watch(
   min-width: 0;
 }
 
-.kg-left-panel__icon-button {
-  --el-button-size: 24px;
+.kg-left-panel__export-button {
+  flex: 0 0 auto;
+  min-width: 58px;
+  font-weight: 700;
 }
 
 .kg-left-panel__content {
@@ -384,6 +394,18 @@ watch(
 
 .kg-left-panel--legend .kg-left-panel__content {
   flex: 0 1 auto;
+}
+
+.kg-detail-content--multi-list,
+.kg-detail-content--multi-empty {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kg-detail-content--multi-empty .kg-detail-empty {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .kg-detail-section {
@@ -607,12 +629,31 @@ watch(
 
 .kg-multi-clear {
   flex: 0 0 auto;
+  font-weight: 700;
 }
 
 .kg-multi-list {
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-right: 2px;
   flex-direction: column;
   gap: 7px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.kg-multi-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.kg-multi-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+.kg-multi-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .kg-multi-card {
