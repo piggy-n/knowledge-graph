@@ -1,6 +1,6 @@
 <script setup>
 import { ElIcon, ElTooltip } from 'element-plus';
-import { FullScreen, Mouse, Pointer, Select, ZoomIn, ZoomOut } from '@element-plus/icons-vue';
+import {FullScreen, Mouse, Operation, Rank, ZoomIn, ZoomOut} from '@element-plus/icons-vue';
 
 defineProps({
   graphMode: { type: String, default: 'select' },
@@ -68,7 +68,7 @@ function setShellRef(element) {
           aria-label="选择模式"
           @click="emit('mode-change', 'select')"
         >
-          <ElIcon><Pointer /></ElIcon>
+          <ElIcon><Mouse /></ElIcon>
         </button>
       </ElTooltip>
       <ElTooltip v-bind="toolbarTooltipProps" content="漫游模式">
@@ -79,18 +79,18 @@ function setShellRef(element) {
           aria-label="漫游模式"
           @click="emit('mode-change', 'roam')"
         >
-          <ElIcon><Mouse /></ElIcon>
+          <ElIcon><Rank /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip v-bind="toolbarTooltipProps" content="多选模式">
+      <ElTooltip v-bind="toolbarTooltipProps" content="批选模式">
         <button
           type="button"
           class="kg-graph-op-button"
           :class="{ 'is-active': graphMode === 'multi' }"
-          aria-label="多选模式"
+          aria-label="批选模式"
           @click="emit('mode-change', 'multi')"
         >
-          <ElIcon><Select /></ElIcon>
+          <ElIcon><Operation /></ElIcon>
         </button>
       </ElTooltip>
     </nav>
