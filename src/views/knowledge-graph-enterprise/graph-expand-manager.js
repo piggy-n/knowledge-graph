@@ -1,5 +1,7 @@
 export class GraphExpandManager {
+  // 当前图谱中实际可见的节点 ID 集合。
   visibleIds = new Set();
+  // 当前已展开的节点 ID 集合，用于恢复展开标记和详情状态。
   expandedIds = new Set();
 
   constructor(dataset) {
@@ -8,6 +10,7 @@ export class GraphExpandManager {
   }
 
   getVisibleGraph() {
+    // 只返回 visibleIds 内的节点和两端都可见的边。
     const nodes = [...this.visibleIds]
       .map((id) => this.dataset.nodeMap.get(id))
       .filter((node) => Boolean(node))
@@ -25,6 +28,7 @@ export class GraphExpandManager {
   }
 
   getNode(id) {
+    // 返回带展开状态和子节点数量的节点快照。
     const node = this.dataset.nodeMap.get(id);
     if (!node) return undefined;
     return {
@@ -39,6 +43,7 @@ export class GraphExpandManager {
   }
 
   getChildren(id) {
+    // 子节点统一通过 childrenMap 读取，供详情面板和图谱逻辑复用。
     return (this.dataset.childrenMap.get(id) || [])
       .map((childId) => this.getNode(childId))
       .filter((node) => Boolean(node));
@@ -49,6 +54,7 @@ export class GraphExpandManager {
   }
 
   getContextIds(id) {
+    // 节点上下文包含自身路径、直接子级和对应关系节点上下文。
     const related = new Set();
     this.addNodeContext(id, related);
 
@@ -63,6 +69,7 @@ export class GraphExpandManager {
   }
 
   getContextEdgeIds(id) {
+    // 上下文边只保留两端都在上下文节点集合内的关系。
     const contextIds = this.getContextIds(id);
     const edgeIds = new Set();
     this.dataset.edges.forEach((edge) => {
@@ -93,12 +100,14 @@ export class GraphExpandManager {
   }
 
   expand(id) {
+    // 单节点展开只追加直接子级，不递归展开孙级。
     const children = this.dataset.childrenMap.get(id) || [];
     children.forEach((childId) => this.visibleIds.add(childId));
     if (children.length) this.expandedIds.add(id);
   }
 
   collapse(id) {
+    // 单节点收起会递归移除所有下级可见节点。
     const children = this.dataset.childrenMap.get(id) || [];
     children.forEach((childId) => {
       this.collapse(childId);
@@ -134,6 +143,7 @@ export class GraphExpandManager {
   }
 
   expandAll() {
+    // 全量展开会显示所有节点，并标记所有存在子级的节点为展开。
     this.dataset.nodeMap.forEach((_node, id) => this.visibleIds.add(id));
     this.dataset.childrenMap.forEach((children, id) => {
       if (children.length) this.expandedIds.add(id);
@@ -141,12 +151,14 @@ export class GraphExpandManager {
   }
 
   collapseAll() {
+    // 默认收起视图只保留根节点，后续展开从根节点重新开始。
     this.visibleIds.clear();
     this.expandedIds.clear();
     if (this.dataset.rootId) this.visibleIds.add(this.dataset.rootId);
   }
 
   revealNode(id) {
+    // 搜索定位前补齐目标节点到根节点的可见路径。
     const path = this.getPathToRoot(id);
     path.forEach((nodeId) => this.visibleIds.add(nodeId));
     path.slice(0, -1).forEach((nodeId) => {
@@ -155,6 +167,7 @@ export class GraphExpandManager {
   }
 
   focusContext(id) {
+    // 搜索局部关系视图只展示目标节点上下文。
     const contextIds = this.getContextIds(id);
     this.visibleIds.clear();
     contextIds.forEach((nodeId) => this.visibleIds.add(nodeId));
@@ -188,10 +201,6 @@ export class GraphExpandManager {
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(text));
     });
-  }
-
-  searchFirst(keyword) {
-    return this.search(keyword)[0];
   }
 
   getPathToRoot(id) {

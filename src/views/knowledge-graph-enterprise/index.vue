@@ -6,6 +6,7 @@ import RightPanelContent from './right-panel-content.vue';
 import GraphCanvasPanel from './graph-canvas-panel.vue';
 import { useEnterpriseGraph } from './use-enterprise-graph';
 
+// 页面组装层只承接组合式逻辑返回的 props 和事件方法。
 const {
   leftPanelProps,
   rightPanelContentProps,
@@ -32,6 +33,7 @@ const {
 
 <template>
   <section class="kg-page kg-page--g6 kg-enterprise-page">
+    <!-- 左侧面板承载详情、多选结果、数据概览和图例。 -->
     <LeftPanel
       v-bind="leftPanelProps"
       @legend-hover="setLegendHover"
@@ -41,6 +43,7 @@ const {
       @download-multi-selection="downloadSelectedNodes"
     />
 
+    <!-- 右侧面板承载搜索工具条、搜索结果和 G6 画布。 -->
     <RightPanel>
       <RightPanelContent
         v-bind="rightPanelContentProps"

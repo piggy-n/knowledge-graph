@@ -1,3 +1,4 @@
+// 节点类型对应的基础颜色，图例和图谱节点保持一致。
 const TYPE_COLORS= {
   root: '#38bdf8',
   system: '#64748b',
@@ -7,6 +8,7 @@ const TYPE_COLORS= {
   'planning-detail': '#a855f7',
 };
 
+// 节点类型对应的基础尺寸，层级细分由 resolveNodeSize 兜底。
 const TYPE_SIZES= {
   root: 145,
   system: 115,
@@ -18,8 +20,10 @@ const TYPE_SIZES= {
 
 const DETAIL_NODE_SIZE = 57;
 
+// 层级关系的原始边标签集合，用于区分包含关系和对应关系。
 const HIERARCHY_LABELS = new Set(['左侧分类体系', '右侧分类体系', '分类体系', '包含']);
 
+// 将原始 JSON 转换为图谱运行时需要的节点、边、父子索引。
 export function transformKnowledgeGraph(raw) {
   const nodeMap = new Map();
   const childrenMap = new Map();
@@ -27,6 +31,7 @@ export function transformKnowledgeGraph(raw) {
   const edges = [];
 
   raw.nodes.forEach((node) => {
+    // 从标签中拆出编码和业务名称，供搜索、详情和节点文字复用。
     const codeMatch = node.label.match(/^(\d{2}H\d|[A-Z]?\d{2,6})\s+(.+)$/);
     const nodeName = node.name || codeMatch?.[2] || node.label;
     const displayName = cleanBusinessName(nodeName, node.id);
@@ -47,6 +52,7 @@ export function transformKnowledgeGraph(raw) {
   });
 
   raw.edges.forEach((edge, index) => {
+    // 根据边类型和标签判断是否为层级包含关系。
     const isHierarchy = edge.type === 'contains' || (!edge.type && HIERARCHY_LABELS.has(edge.label || ''));
     edges.push({
       ...edge,
@@ -60,6 +66,7 @@ export function transformKnowledgeGraph(raw) {
     }
   });
 
+  // 递归展开 children 字段中的补充分类节点。
   function appendRawChildren(parentId, children) {
     const parent = nodeMap.get(parentId);
     if (!parent) return;
@@ -107,6 +114,7 @@ export function transformKnowledgeGraph(raw) {
   });
 
   nodeMap.forEach((node, id) => {
+    // 补齐父级、体系、子节点数量等派生字段。
     const parentId = parentMap.get(id);
     const parent = parentId ? nodeMap.get(parentId) : undefined;
     node.parentId = parentId;

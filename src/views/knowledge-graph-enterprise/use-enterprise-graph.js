@@ -36,6 +36,7 @@ export function useEnterpriseGraph() {
   let graphHeight = 0;
   let locateTimer = 0;
   let locateBlinkTimer = 0;
+  // 延迟单击聚焦，给双击展开留出取消单击的窗口。
   let nodeClickTimer = 0;
   const layoutCache = new Map();
   let graphMounted = false;
@@ -397,6 +398,7 @@ export function useEnterpriseGraph() {
   }
 
   function getG6NodeTextSpec(node) {
+    // 根据节点半径和名称长度计算中心文字分行和字号。
     const name = node.displayName || node.name || node.label;
     const length = [...name].length;
     const radius = node.size / 2;
@@ -428,6 +430,7 @@ export function useEnterpriseGraph() {
   }
 
   function wrapG6Text(text, maxCharsPerLine, maxLines) {
+    // 中文节点名称按固定字符数切分，超出行数时尾行省略。
     const chars = [...text.replace(/\s+/g, '')];
     const lines = [];
     for (let index = 0; index < chars.length; index += maxCharsPerLine) {
@@ -772,6 +775,7 @@ export function useEnterpriseGraph() {
   }
 
   function setNodeEventCapture(item, enabled) {
+    // 禁用非聚焦节点事件捕获，避免遮挡聚焦节点或画布拖动。
     const container = item.getContainer?.();
     container?.set?.('capture', enabled);
     container?.get?.('children')?.forEach((shape) => {

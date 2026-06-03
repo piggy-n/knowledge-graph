@@ -4,6 +4,7 @@ import { ElButton, ElEmpty, ElPagination, ElTable, ElTableColumn, ElTag } from '
 import { Close, Download } from '@element-plus/icons-vue';
 import { formatNodeName } from './graph-data';
 
+// 左侧面板统一展示节点详情、多选结果、数据概览和图例。
 const props = defineProps({
   node: { type: Object, default: undefined },
   children: { type: Array, default: () => [] },
@@ -22,6 +23,7 @@ const emit = defineEmits(['legend-hover', 'legend-toggle', 'remove-multi-node', 
 const childPage = ref(1);
 const childPageSize = 5;
 
+// 节点基础字段按展示需要过滤空值，避免详情区出现空行。
 const rows = computed(() => {
   const node = props.node;
   if (!node) return [];
@@ -50,6 +52,7 @@ const rows = computed(() => {
   ].filter(([, value]) => value !== undefined && value !== null && value !== '');
 });
 
+// 子节点表格分页只影响当前详情面板展示，不改变图谱展开状态。
 const pagedChildren = computed(() => {
   const start = (childPage.value - 1) * childPageSize;
   return props.children.slice(start, start + childPageSize);

@@ -2,12 +2,14 @@
 import { ElIcon, ElTooltip } from 'element-plus';
 import {FullScreen, Mouse, Operation, Rank, ZoomIn, ZoomOut} from '@element-plus/icons-vue';
 
+// 画布组件只负责 DOM 容器和工具栏展示，G6 实例由组合式逻辑维护。
 defineProps({
   graphMode: { type: String, default: 'select' },
   isFullscreen: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['container-change', 'shell-change', 'toggle-fullscreen', 'zoom', 'mode-change']);
+// 工具栏 tooltip 关闭延迟和动画，避免连续悬停时残留。
 const toolbarTooltipProps = {
   placement: 'left',
   showAfter: 0,

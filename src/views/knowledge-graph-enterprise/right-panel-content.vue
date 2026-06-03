@@ -4,6 +4,7 @@ import { ElButton, ElIcon, ElInput, ElSwitch, ElTag } from 'element-plus';
 import { ArrowDown, ArrowRight, ArrowUp, Back, Close, Connection, Fold, Refresh, Search, View } from '@element-plus/icons-vue';
 import { formatNodeName } from './graph-data';
 
+// 右侧内容组件接收搜索状态和工具条状态，图谱画布通过插槽注入。
 const props = defineProps({
   searchKeyword: { type: String, default: '' },
   searchResults: { type: Array, default: () => [] },
@@ -14,12 +15,15 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['search', 'expand-all', 'collapse-all', 'toggle-relation-labels', 'relayout', 'select-result', 'restore-full-graph']);
+// 本地输入框值和搜索结果面板折叠状态，避免直接修改父级 props。
 const keyword = ref(props.searchKeyword);
 const resultsClosed = ref(false);
 const resultsCollapsed = ref(false);
 const activeResultId = ref('');
+// 高频检索词只用于快捷触发搜索，不参与搜索数据处理。
 const quickKeywords = ['耕地', '湿地', '交通', '水域', '盐田', '住宅用地'];
 
+// 父级搜索关键词变化时同步输入框展示。
 watch(
   () => props.searchKeyword,
   (value) => {
@@ -27,6 +31,7 @@ watch(
   },
 );
 
+// 手动搜索会展开搜索结果面板并重置当前激活项。
 function handleSearch() {
   resultsClosed.value = false;
   resultsCollapsed.value = false;
@@ -34,6 +39,7 @@ function handleSearch() {
   emit('search', keyword.value);
 }
 
+// 快捷搜索复用普通搜索事件，保持搜索逻辑集中在组合式逻辑里。
 function handleQuickSearch(value) {
   keyword.value = value;
   resultsClosed.value = false;
@@ -42,12 +48,14 @@ function handleQuickSearch(value) {
   emit('search', value);
 }
 
+// 搜索结果点击后折叠结果列表，并把定位动作交给父级处理。
 function handleSelectResult(node) {
   activeResultId.value = node.id;
   resultsCollapsed.value = true;
   emit('select-result', node);
 }
 
+// 关闭按钮只隐藏当前结果面板，不清空父级搜索结果数据。
 function closeResults() {
   resultsClosed.value = true;
 }

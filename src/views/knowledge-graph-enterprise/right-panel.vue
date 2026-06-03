@@ -1,4 +1,5 @@
 <template>
+  <!-- 右侧容器只负责布局承载，具体业务内容由插槽组件提供。 -->
   <main class="kg-enterprise-right">
     <slot></slot>
   </main>
