@@ -537,9 +537,9 @@ export function useEnterpriseGraph() {
     return 1.6;
   }
 
-  function setEdgeTextState(item, active, forceHidden = false) {
+  function setEdgeTextState(item, active, forceHidden = false, options = {}) {
     const model = item.getModel();
-    updateEdgeVisual(item, active);
+    updateEdgeVisual(item, active, options);
     const defaultLabel = relationLabelsVisible.value && model.originLabel && (model.relationType === 'hierarchy' || model.relationType === 'mapping') ? model.originLabel : '';
     graph.updateItem(item, {
       label: forceHidden ? '' : active && relationLabelsVisible.value ? model.originLabel : defaultLabel,
@@ -560,21 +560,24 @@ export function useEnterpriseGraph() {
     });
   }
 
-  function updateEdgeVisual(item, active = false) {
+  function updateEdgeVisual(item, active = false, options = {}) {
     const model = item.getModel();
     const baseStyle = model.originStyle || model.style || {};
     const mapping = model.relationType === 'mapping';
     const lineWidth = Number(baseStyle.lineWidth || 1.6);
+    const hideArrow = options.hideInactiveArrow && !active;
     graph.updateItem(item, {
       style: {
         ...baseStyle,
         stroke: active && mapping ? '#f59e0b' : baseStyle.stroke,
         lineWidth: active ? lineWidth + (mapping ? 1.4 : 1.8) : lineWidth,
         opacity: active ? 1 : baseStyle.opacity ?? 0.6,
-        endArrow: {
-          ...(baseStyle.endArrow || {}),
-          fill: active && mapping ? '#f59e0b' : baseStyle.endArrow?.fill,
-        },
+        endArrow: hideArrow
+          ? false
+          : {
+              ...(baseStyle.endArrow || {}),
+              fill: active && mapping ? '#f59e0b' : baseStyle.endArrow?.fill,
+            },
       },
     });
   }
@@ -584,7 +587,7 @@ export function useEnterpriseGraph() {
     applyNodeFocus(id, {
       dimOpacity: 0.08,
       relatedOpacity: 0.96,
-      hideDimLabels: true,
+      hideDimLabels: shouldHideDimLabelsInFocus(),
     });
   }
 
@@ -597,8 +600,13 @@ export function useEnterpriseGraph() {
     applyNodeFocus(selectedFocusId.value, {
       dimOpacity: 0.06,
       relatedOpacity: 0.98,
-      hideDimLabels: true,
+      hideDimLabels: shouldHideDimLabelsInFocus(),
     });
+  }
+
+  // 选择模式下保留非聚焦节点名称，漫游和多选沿用隐藏策略。
+  function shouldHideDimLabelsInFocus() {
+    return graphMode.value !== 'select';
   }
 
   // 聚焦存在时，只允许当前聚焦上下文内节点参与漫游查看、多选和拖动。
@@ -613,6 +621,7 @@ export function useEnterpriseGraph() {
     const relatedEdgeIds = manager.getContextEdgeIds(id);
     const dimOpacity = options.dimOpacity ?? 0.08;
     const relatedOpacity = options.relatedOpacity ?? 0.96;
+    const dimLabelOpacity = options.hideDimLabels ? undefined : 1;
     graph.getNodes().forEach((item) => {
       const itemId = item.getModel().id;
       const related = relatedIds.has(itemId);
@@ -621,12 +630,13 @@ export function useEnterpriseGraph() {
         dim: itemId !== id && !related,
         opacity: itemId === id ? 1 : related ? relatedOpacity : dimOpacity,
         labelHidden: options.hideDimLabels && itemId !== id && !related,
+        labelOpacity: itemId !== id && !related ? dimLabelOpacity : undefined,
       });
     });
     graph.getEdges().forEach((item) => {
       const model = item.getModel();
       const active = relatedEdgeIds.has(model.id);
-      setEdgeTextState(item, active, !active);
+      setEdgeTextState(item, active, !active, { hideInactiveArrow: true });
       graph.setItemState(item, 'inactive', !active);
     });
   }
@@ -646,7 +656,7 @@ export function useEnterpriseGraph() {
     });
     graph.getEdges().forEach((item) => {
       const active = item.getModel().id === edgeId;
-      setEdgeTextState(item, active, !active);
+      setEdgeTextState(item, active, !active, { hideInactiveArrow: true });
       graph.setItemState(item, 'inactive', !active);
     });
   }
@@ -700,7 +710,7 @@ export function useEnterpriseGraph() {
       style: {
         ...labelStyle,
         cursor,
-        opacity: options.labelHidden ? 0 : options.dim ? 0.18 : 1,
+        opacity: options.labelHidden ? 0 : options.labelOpacity ?? (options.dim ? 0.18 : 1),
       },
     };
 
