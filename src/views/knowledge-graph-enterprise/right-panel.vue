@@ -62,7 +62,7 @@ function closeResults() {
             v-model="keyword"
             class="kg-enterprise-search"
             clearable
-            placeholder="请输入分类名称、编码或对应关系"
+            placeholder="请输入分类名称或编码"
             :prefix-icon="Search"
             @keyup.enter="handleSearch"
           />
