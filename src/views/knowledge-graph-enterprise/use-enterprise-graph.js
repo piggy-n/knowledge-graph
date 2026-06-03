@@ -6,39 +6,63 @@ import rawGraphData from '../../data/data.json';
 import { formatNodeName, transformKnowledgeGraph } from './graph-data';
 import { GraphExpandManager } from './graph-expand-manager';
 
+// 企业版图谱页面的组合式逻辑入口，集中维护图谱状态和交互方法。
 export function useEnterpriseGraph() {
+  // G6 渲染容器引用，由画布组件回传。
   const containerRef = ref(null);
+  // 画布全屏外壳引用，用于进入和退出局部全屏。
   const canvasShellRef = ref(null);
+  // 当前左侧详情面板展示的节点。
   const selectedNode = ref();
+  // 图谱区域轻量提示文案。
   const message = ref('');
+  // 关系文字显示开关状态。
   const relationLabelsVisible = ref(true);
+  // 当前搜索命中的节点列表。
   const searchResults = ref([]);
+  // 当前搜索关键词。
   const searchKeyword = ref('');
   // 图谱数据视图模式：fullGraph 为完整图谱，searchGraph 为搜索局部关系图。
   const graphViewMode = ref('fullGraph');
   // 搜索结果进入局部关系视图时的上下文节点，供展开、收起、重算布局复用。
   const searchContextId = ref('');
+  // 搜索定位闪烁中的节点 ID。
   const locatedNodeId = ref('');
+  // 单击产生的持久聚焦节点 ID。
   const selectedFocusId = ref('');
+  // 左侧数据概览指标。
   const overviewItems = ref([]);
+  // 当前点击选中的图例 ID。
   const activeLegendId = ref('');
+  // 当前鼠标悬浮的图例 ID。
   const hoveredLegendId = ref('');
   // 图谱交互模式：选择、漫游、多选三者互斥。
   const graphMode = ref('select');
+  // 当前图谱区域是否处于全屏状态。
   const isFullscreen = ref(false);
   // 多选节点 ID 集合，用于在重新渲染后恢复节点选中态。
   const selectedMultiNodeIds = ref(new Set());
+  // G6 图实例。
   let graph;
+  // 图谱展开收起状态管理器。
   let manager;
+  // G6 是否已经完成首次 render。
   let graphRendered = false;
+  // resize 的 requestAnimationFrame 句柄。
   let resizeFrame = 0;
+  // 最近一次记录的画布宽度。
   let graphWidth = 0;
+  // 最近一次记录的画布高度。
   let graphHeight = 0;
+  // 搜索定位高亮结束定时器。
   let locateTimer = 0;
+  // 搜索定位闪烁定时器。
   let locateBlinkTimer = 0;
   // 延迟单击聚焦，给双击展开留出取消单击的窗口。
   let nodeClickTimer = 0;
+  // 布局坐标缓存，减少重复渲染时的位置抖动。
   const layoutCache = new Map();
+  // 页面挂载状态，避免 ref 先后顺序导致重复初始化。
   let graphMounted = false;
 
   // 接收画布容器元素，供 G6 初始化和 resize 使用。
@@ -52,6 +76,7 @@ export function useEnterpriseGraph() {
     canvasShellRef.value = element;
   }
 
+  // 图例配置同时驱动左侧图例和图例筛选逻辑。
   const legendItems = [
     { id: 'root', type: 'root', label: '中心主题', color: '#38bdf8' },
     { id: 'system', type: 'system', label: '分类体系', color: '#64748b' },
@@ -64,12 +89,13 @@ export function useEnterpriseGraph() {
     { id: 'edge-hierarchy', label: '包含关系', color: '#2563eb', lineType: 'solid', lineWidth: 3 },
   ];
 
-  const activeLegendLabel = computed(() => {
-    return legendItems.find((item) => item.id === activeLegendId.value)?.label;
-  });
+  // 节点图例项，过滤掉关系线图例。
   const nodeLegendItems = computed(() => legendItems.filter((item) => item.type));
+  // 关系图例项，过滤掉节点类型图例。
   const relationLegendItems = computed(() => legendItems.filter((item) => item.lineType));
+  // 当前详情节点的下级节点列表。
   const selectedChildren = computed(() => (selectedNode.value && manager ? manager.getChildren(selectedNode.value.id) : []));
+  // 当前多选节点快照，用于左侧列表和导出。
   const selectedMultiNodes = computed(() => {
     if (!manager) return [];
     return [...selectedMultiNodeIds.value]
@@ -89,9 +115,9 @@ export function useEnterpriseGraph() {
     nodeLegendItems: nodeLegendItems.value,
     relationLegendItems: relationLegendItems.value,
     activeLegendId: activeLegendId.value,
-    activeLegendLabel: activeLegendLabel.value,
   }));
 
+  // 右侧内容组件 props，承接搜索、工具条和提示状态。
   const rightPanelContentProps = computed(() => ({
     searchKeyword: searchKeyword.value,
     searchResults: searchResults.value,
@@ -101,20 +127,23 @@ export function useEnterpriseGraph() {
     searchResultPath,
   }));
 
+  // 画布组件 props，只包含工具栏和全屏展示状态。
   const canvasPanelProps = computed(() => ({
     graphMode: graphMode.value,
     isFullscreen: isFullscreen.value,
   }));
 
   try {
+    // 原始 JSON 转换后的运行时数据集。
     const dataset = transformKnowledgeGraph(rawGraphData);
     manager = new GraphExpandManager(dataset);
     manager.expandAll();
     selectedNode.value = manager.getNode(dataset.rootId);
-  } catch (error) {
-    message.value = error instanceof Error ? error.message : 'JSON 数据加载失败';
+  } catch {
+    message.value = 'JSON 数据加载失败';
   }
 
+  // 页面挂载后等待 DOM 完成，再初始化 G6 和监听器。
   onMounted(async () => {
     graphMounted = true;
     await nextTick();
@@ -124,6 +153,7 @@ export function useEnterpriseGraph() {
     mountGraphWhenReady();
   });
 
+  // 页面卸载时清理 G6、定时器和全局监听。
   onBeforeUnmount(() => {
     graphMounted = false;
     if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
@@ -139,6 +169,7 @@ export function useEnterpriseGraph() {
 
   // 初始化 G6 实例和事件，具体行为由当前图谱模式分流。
   function initGraph() {
+    // 当前 G6 容器 DOM。
     const container = containerRef.value;
     if (!container) return;
     if (graph) {
@@ -162,6 +193,7 @@ export function useEnterpriseGraph() {
             type: 'drag-canvas',
             allowDragOnItem: { node: true, edge: false, combo: false },
             shouldBegin: (event) => {
+              // 当前拖拽命中的节点 ID，空值表示拖动画布。
               const id = event.item?.getModel()?.id;
               if (!id) return true;
               return isFocusLimitedMode() && !canUseFocusedContextNode(id);
@@ -172,6 +204,7 @@ export function useEnterpriseGraph() {
             type: 'drag-node',
             shouldBegin: (event) => {
               if (!['roam', 'multi'].includes(graphMode.value)) return true;
+              // 漫游和多选模式下用于判断节点是否允许被拖动。
               const id = event.item?.getModel()?.id;
               return !id || canUseFocusedContextNode(id);
             },
@@ -210,6 +243,7 @@ export function useEnterpriseGraph() {
     });
 
     graph.on('node:click', (event) => {
+      // 单击节点 ID，用于区分普通选择、漫游查看和多选。
       const id = event.item?.getModel()?.id;
       if (!id) return;
       if (graphMode.value === 'multi') {
@@ -233,10 +267,12 @@ export function useEnterpriseGraph() {
     });
 
     graph.on('node:dblclick', (event) => {
+      // 双击节点 ID，只参与展开收起，不参与单击聚焦。
       const id = event.item?.getModel()?.id;
       if (!id) return;
       if (graphMode.value !== 'select') return;
       clearPendingNodeClick();
+      // 搜索局部上下文 ID，存在时只在局部图内展开收起。
       const contextId = getActiveSearchContextId();
       if (contextId) {
         manager.toggleInContext(id, contextId);
@@ -265,6 +301,7 @@ export function useEnterpriseGraph() {
 
     graph.on('node:mouseenter', (event) => {
       if (graphMode.value !== 'select') return;
+      // hover 节点 ID，仅选择模式用于临时聚焦。
       const id = event.item?.getModel()?.id;
       if (!id) return;
       applyHover(id);
@@ -288,18 +325,22 @@ export function useEnterpriseGraph() {
     });
   }
 
+  // 清理延迟单击定时器，避免双击时残留单击聚焦。
   function clearPendingNodeClick() {
     if (!nodeClickTimer) return;
     window.clearTimeout(nodeClickTimer);
     nodeClickTimer = 0;
   }
 
+  // 清理持久聚焦和由聚焦产生的节点、边视觉状态。
   function clearFocusVisualState() {
     selectedFocusId.value = '';
     if (graph) resetGraphVisualState();
   }
 
+  // 等待画布容器有尺寸后再挂载 G6。
   function mountGraphWhenReady(retryCount = 0) {
+    // 当前尝试挂载时的画布容器。
     const container = containerRef.value;
     if (!container) return;
     if (container.clientWidth && container.clientHeight) {
@@ -315,10 +356,13 @@ export function useEnterpriseGraph() {
     }
   }
 
+  // 渲染当前可见图谱，并恢复图例、聚焦、搜索定位视觉状态。
   function renderGraph() {
     if (!graph || !containerRef.value) return;
+    // 当前可见节点和边。
     const visibleData = manager.getVisibleGraph();
     updateOverview(visibleData.nodes, visibleData.edges);
+    // 转换后的 G6 数据。
     const graphData = toG6Data();
     if (graphRendered) {
       graph.changeData(graphData);
@@ -337,20 +381,32 @@ export function useEnterpriseGraph() {
 
   // 将当前可见知识图谱转换为 G6 节点和边。
   function toG6Data() {
+    // 当前画布宽度。
     const width = containerRef.value?.clientWidth || 1200;
+    // 当前画布高度。
     const height = containerRef.value?.clientHeight || 760;
+    // G6 坐标中心点 X。
     const centerX = width / 2;
+    // G6 坐标中心点 Y。
     const centerY = height / 2;
+    // 当前可见图谱数据。
     const data = manager.getVisibleGraph();
+    // 力导向布局后的节点坐标。
     const layoutMap = buildForceLayout(data.nodes, data.edges);
 
     return {
       nodes: data.nodes.map((node) => {
+        // 是否为根节点，根节点使用更强视觉样式。
         const isRoot = node.type === 'root';
+        // 当前节点中心文字的分行和字号配置。
         const textSpec = getG6NodeTextSpec(node);
+        // 当前节点布局坐标，优先使用缓存布局。
         const position = layoutMap.get(node.id) || { x: node.x, y: node.y };
+        // 当前节点填充色，根节点使用渐变。
         const nodeFill = isRoot ? 'l(90) 0:#38bdf8 1:#0ea5e9' : node.color;
+        // 当前节点描边宽度。
         const nodeLineWidth = isRoot ? 3 : 2;
+        // 当前节点默认样式，后续 hover 和聚焦都以此为基准恢复。
         const nodeStyle = {
           fill: nodeFill,
           stroke: '#ffffff',
@@ -397,12 +453,17 @@ export function useEnterpriseGraph() {
     };
   }
 
+  // 根据节点半径和名称长度计算中心文字分行和字号。
   function getG6NodeTextSpec(node) {
-    // 根据节点半径和名称长度计算中心文字分行和字号。
+    // 节点展示名称，优先使用清洗后的业务名称。
     const name = node.displayName || node.name || node.label;
+    // 节点名称字符长度，用于字号分档。
     const length = [...name].length;
+    // 节点半径，用于约束文字最大宽高。
     const radius = node.size / 2;
+    // 当前节点最多允许的文字行数。
     const maxLines = node.type === 'root' || node.type === 'system' ? 3 : 2;
+    // 初始字号，后续按节点尺寸和文本长度调整。
     let fontSize = 10;
 
     if (length <= 2) fontSize = Math.min(24, radius * 0.68);
@@ -411,10 +472,15 @@ export function useEnterpriseGraph() {
     else if (length <= 8) fontSize = Math.min(16, radius * 0.44);
     else fontSize = Math.max(10, Math.min(14, radius * 0.38));
 
+    // 单行最多字符数，保证文字不溢出节点圆形区域。
     const maxCharsPerLine = Math.max(2, Math.floor((radius * 1.52) / fontSize));
+    // 节点文字分行结果。
     const lines = wrapG6Text(name, maxCharsPerLine, maxLines);
+    // 节点内文字允许占用的最大高度。
     const maxTextHeight = radius * 1.35;
+    // 未压缩前的行高。
     const rawLineHeight = fontSize * 1.18;
+    // 当前分行后的总文字高度。
     const totalHeight = rawLineHeight * lines.length;
 
     if (totalHeight > maxTextHeight) {
@@ -429,15 +495,19 @@ export function useEnterpriseGraph() {
     };
   }
 
+  // 中文节点名称按固定字符数切分，超出行数时尾行省略。
   function wrapG6Text(text, maxCharsPerLine, maxLines) {
-    // 中文节点名称按固定字符数切分，超出行数时尾行省略。
+    // 去除空白后的字符数组。
     const chars = [...text.replace(/\s+/g, '')];
+    // 分行后的文本数组。
     const lines = [];
     for (let index = 0; index < chars.length; index += maxCharsPerLine) {
       lines.push(chars.slice(index, index + maxCharsPerLine).join(''));
     }
     if (lines.length > maxLines) {
+      // 可见行集合，超过行数后只保留前几行。
       const visible = lines.slice(0, maxLines);
+      // 需要追加省略号的最后一行。
       const last = visible[visible.length - 1];
       visible[visible.length - 1] = `${last.slice(0, Math.max(1, maxCharsPerLine - 1))}...`;
       return visible;
@@ -445,16 +515,24 @@ export function useEnterpriseGraph() {
     return lines;
   }
 
+  // 将字号修正为偶数字号，降低低缩放层级下的文字发糊感。
   function toEvenFontSize(size) {
+    // 四舍五入后的最小字号。
     const rounded = Math.max(10, Math.round(size));
     return rounded % 2 === 0 ? rounded : rounded + 1;
   }
 
+  // 将业务边转换为 G6 边模型。
   function toG6Edge(edge) {
+    // 是否为对应关系边。
     const mapping = edge.relationType === 'mapping';
+    // 简化后的关系文字。
     const labelText = simplifyEdgeLabel(edge);
+    // 当前开关状态下实际显示的关系文字。
     const label = relationLabelsVisible.value && isDefaultVisibleLabel(edge) ? labelText : '';
+    // 当前关系线宽。
     const lineWidth = edgeLineWidth(edge);
+    // 当前关系线默认样式，聚焦后会基于该样式恢复。
     const edgeStyle = {
       stroke: mapping ? 'rgba(245, 158, 11, 0.52)' : 'rgba(37, 99, 235, 0.25)',
       lineWidth,
@@ -493,14 +571,18 @@ export function useEnterpriseGraph() {
     };
   }
 
+  // 基于当前可见节点和边计算力导布局坐标。
   function buildForceLayout(nodes, edges) {
     if (nodes.length <= 1) {
+      // 单节点场景固定放在画布中心。
       const singleMap = new Map();
       nodes.forEach((node) => singleMap.set(node.id, { x: 0, y: 0 }));
       return singleMap;
     }
 
+    // 参与 d3 力导模拟的节点副本。
     const simulationNodes = nodes.map((node) => {
+      // 上一次布局缓存坐标。
       const cached = layoutCache.get(node.id);
       return {
         ...node,
@@ -510,8 +592,10 @@ export function useEnterpriseGraph() {
         fy: node.type === 'root' ? 0 : undefined,
       };
     });
+    // 参与 d3 力导模拟的边副本。
     const links = edges.map((edge) => ({ ...edge }));
 
+    // d3 力导模拟器，当前只用于同步计算布局。
     const simulation = d3
       .forceSimulation(simulationNodes)
       .force(
@@ -540,10 +624,14 @@ export function useEnterpriseGraph() {
       simulation.tick();
     }
 
+    // 本轮布局计算结果。
     const result = new Map();
     simulationNodes.forEach((node) => {
+      // 归一化后的 X 坐标。
       const x = Number.isFinite(node.x) ? node.x || 0 : 0;
+      // 归一化后的 Y 坐标。
       const y = Number.isFinite(node.y) ? node.y || 0 : 0;
+      // 当前节点最终坐标。
       const position = { x, y };
       result.set(node.id, position);
       layoutCache.set(node.id, position);
@@ -551,6 +639,7 @@ export function useEnterpriseGraph() {
     return result;
   }
 
+  // 统一简化原始关系文字，减少图中重复长文案。
   function simplifyEdgeLabel(edge) {
     if (!edge.label || edge.label.includes('无对应') || edge.label.includes('暂无对应')) return '';
     if (edge.label === '对应分类') return '对应';
@@ -560,12 +649,15 @@ export function useEnterpriseGraph() {
     return edge.label;
   }
 
+  // 判断关系文字是否允许在默认状态下显示。
   function isDefaultVisibleLabel(edge) {
     return Boolean(simplifyEdgeLabel(edge) && (edge.relationType === 'hierarchy' || edge.relationType === 'mapping'));
   }
 
+  // 根据关系类型和来源节点层级计算线宽。
   function edgeLineWidth(edge) {
     if (edge.relationType === 'mapping') return 1.8;
+    // 关系源节点，用于判断根节点和体系节点。
     const source = manager.getNode(edge.source);
     if (source?.type === 'root') return 4.2;
     if (source?.type === 'system') return 3.4;
@@ -573,9 +665,12 @@ export function useEnterpriseGraph() {
     return 1.6;
   }
 
+  // 更新关系文字显示状态和激活样式。
   function setEdgeTextState(item, active, forceHidden = false, options = {}) {
+    // G6 边模型。
     const model = item.getModel();
     updateEdgeVisual(item, active, options);
+    // 默认关系文字，受“显示关系文字”开关控制。
     const defaultLabel = relationLabelsVisible.value && model.originLabel && (model.relationType === 'hierarchy' || model.relationType === 'mapping') ? model.originLabel : '';
     graph.updateItem(item, {
       label: forceHidden ? '' : active && relationLabelsVisible.value ? model.originLabel : defaultLabel,
@@ -596,11 +691,17 @@ export function useEnterpriseGraph() {
     });
   }
 
+  // 更新关系线条、箭头和透明度。
   function updateEdgeVisual(item, active = false, options = {}) {
+    // G6 边模型。
     const model = item.getModel();
+    // 关系线原始样式。
     const baseStyle = model.originStyle || model.style || {};
+    // 是否为对应关系。
     const mapping = model.relationType === 'mapping';
+    // 原始线宽。
     const lineWidth = Number(baseStyle.lineWidth || 1.6);
+    // 非激活关系是否隐藏箭头。
     const hideArrow = options.hideInactiveArrow && !active;
     graph.updateItem(item, {
       style: {
@@ -627,6 +728,7 @@ export function useEnterpriseGraph() {
     });
   }
 
+  // 应用单击产生的持久聚焦状态。
   function applySelectedFocus() {
     if (!selectedFocusId.value || !manager?.isVisible(selectedFocusId.value)) {
       selectedFocusId.value = '';
@@ -652,14 +754,22 @@ export function useEnterpriseGraph() {
     return manager.getConnectedIds(selectedFocusId.value).has(id);
   }
 
+  // 按节点上下文更新节点、关系的聚焦和淡化样式。
   function applyNodeFocus(id, options = {}) {
+    // 当前聚焦节点的上下文节点集合。
     const relatedIds = manager.getConnectedIds(id);
+    // 当前聚焦节点的上下文关系集合。
     const relatedEdgeIds = manager.getContextEdgeIds(id);
+    // 非上下文节点透明度。
     const dimOpacity = options.dimOpacity ?? 0.08;
+    // 上下文节点透明度。
     const relatedOpacity = options.relatedOpacity ?? 0.96;
+    // 非上下文节点标签透明度。
     const dimLabelOpacity = options.hideDimLabels ? undefined : 1;
     graph.getNodes().forEach((item) => {
+      // 当前遍历节点 ID。
       const itemId = item.getModel().id;
+      // 当前节点是否属于聚焦上下文。
       const related = relatedIds.has(itemId);
       updateNodeVisual(item, {
         hot: itemId === id,
@@ -670,19 +780,27 @@ export function useEnterpriseGraph() {
       });
     });
     graph.getEdges().forEach((item) => {
+      // 当前遍历关系模型。
       const model = item.getModel();
+      // 当前关系是否属于聚焦上下文。
       const active = relatedEdgeIds.has(model.id);
       setEdgeTextState(item, active, !active, { hideInactiveArrow: true });
       graph.setItemState(item, 'inactive', !active);
     });
   }
 
+  // 关系 hover 时只高亮该关系两端节点。
   function applyEdgeHover(edgeItem) {
+    // 当前 hover 关系 ID。
     const edgeId = edgeItem.getModel().id;
+    // 当前 hover 关系模型。
     const model = edgeItem.getModel();
+    // 当前 hover 关系两端节点 ID。
     const relatedIds = new Set([model.source, model.target]);
     graph.getNodes().forEach((item) => {
+      // 当前节点是否为关系端点。
       const related = relatedIds.has(item.getModel().id);
+      // 当前遍历节点 ID。
       const itemId = item.getModel().id;
       updateNodeVisual(item, {
         hot: related,
@@ -692,12 +810,14 @@ export function useEnterpriseGraph() {
       });
     });
     graph.getEdges().forEach((item) => {
+      // 当前关系是否为 hover 关系。
       const active = item.getModel().id === edgeId;
       setEdgeTextState(item, active, !active, { hideInactiveArrow: true });
       graph.setItemState(item, 'inactive', !active);
     });
   }
 
+  // 清理 hover 产生的临时视觉状态。
   function clearHover() {
     if (selectedFocusId.value) {
       applyLegendState();
@@ -709,6 +829,7 @@ export function useEnterpriseGraph() {
     resetGraphVisualState();
   }
 
+  // 恢复所有节点和关系的默认视觉状态。
   function resetGraphVisualState() {
     graph.getNodes().forEach((item) => {
       updateNodeVisual(item);
@@ -721,27 +842,39 @@ export function useEnterpriseGraph() {
     applyLegendState();
   }
 
+  // 应用搜索定位闪烁状态。
   function applyLocatedState() {
     if (!graph) return;
     if (!locatedNodeId.value) return;
+    // 当前定位节点图元。
     const item = graph.findById(locatedNodeId.value);
     if (item) updateNodeVisual(item, { hot: true, opacity: 1 });
   }
 
+  // 按传入状态更新单个节点图元的样式和事件捕获。
   function updateNodeVisual(item, options = {}) {
+    // G6 节点模型。
     const model = item.getModel();
+    // 节点原始样式。
     const baseStyle = model.originStyle || model.style || {};
+    // 节点原始标签样式。
     const labelStyle = model.labelCfg?.originStyle || model.labelCfg?.style || {};
+    // 节点原始描边宽度。
     const lineWidth = Number(baseStyle.lineWidth || 2);
+    // 当前节点是否处于多选选中态。
     const multiSelected = selectedMultiNodeIds.value.has(model.id);
+    // 聚焦限制模式下当前节点是否禁用交互。
     const disabledByFocusMode = isFocusLimitedMode() && !canUseFocusedContextNode(model.id);
+    // 当前节点鼠标指针样式。
     const cursor = disabledByFocusMode ? 'default' : baseStyle.cursor || 'pointer';
     setNodeEventCapture(item, !disabledByFocusMode);
+    // 当前节点主体样式。
     const style = {
       ...baseStyle,
       cursor,
       opacity: options.opacity ?? (options.dim ? 0.14 : baseStyle.opacity ?? 0.92),
     };
+    // 当前节点标签样式。
     const labelCfg = {
       ...model.labelCfg,
       style: {
@@ -774,8 +907,9 @@ export function useEnterpriseGraph() {
     graph.updateItem(item, { style, labelCfg });
   }
 
+  // 禁用非聚焦节点事件捕获，避免遮挡聚焦节点或画布拖动。
   function setNodeEventCapture(item, enabled) {
-    // 禁用非聚焦节点事件捕获，避免遮挡聚焦节点或画布拖动。
+    // 当前节点容器图元。
     const container = item.getContainer?.();
     container?.set?.('capture', enabled);
     container?.get?.('children')?.forEach((shape) => {
@@ -783,6 +917,7 @@ export function useEnterpriseGraph() {
     });
   }
 
+  // 判断当前是否处于需要限制非聚焦节点交互的模式。
   function isFocusLimitedMode() {
     return Boolean(selectedFocusId.value && ['roam', 'multi'].includes(graphMode.value));
   }
@@ -794,29 +929,37 @@ export function useEnterpriseGraph() {
     applyLegendState();
   }
 
+  // 切换左侧图例选中态。
   function toggleLegend(id) {
     if (!legendItems.find((item) => item.id === id)?.type) return;
     activeLegendId.value = activeLegendId.value === id ? '' : id;
     applyLegendState();
   }
 
+  // 按当前图例 hover 或选中状态更新节点淡化效果。
   function applyLegendState() {
     if (!graph) return;
+    // 当前生效图例。
     const legend = legendItems.find((item) => item.id === (activeLegendId.value || hoveredLegendId.value));
     graph.getNodes().forEach((item) => {
+      // 当前节点业务数据。
       const node = item.getModel().origin ;
+      // 当前节点是否需要被图例淡化。
       const dim = Boolean(legend && node && !matchesLegend(node, legend));
       updateNodeVisual(item, { dim, opacity: dim ? 0.14 : 0.92 });
     });
   }
 
+  // 判断节点是否匹配当前图例过滤条件。
   function matchesLegend(node, legend) {
     if (!legend.type) return false;
     if (node.type !== legend.type) return false;
     return !legend.levelName || node.levelName === legend.levelName;
   }
 
+  // 更新左侧数据概览指标。
   function updateOverview(nodes, edges) {
+    // 统计指定节点类型数量的快捷函数。
     const typeCount = (type) => nodes.filter((node) => node.type === type).length;
     overviewItems.value = [
       ['实体节点', String(nodes.length)],
@@ -830,12 +973,15 @@ export function useEnterpriseGraph() {
     ];
   }
 
+  // 画布尺寸变化时同步 G6 尺寸。
   function resizeGraph() {
     if (!graph || !containerRef.value) return;
     if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     resizeFrame = window.requestAnimationFrame(() => {
       if (!graph || !containerRef.value) return;
+      // 最新画布宽度。
       const width = containerRef.value.clientWidth;
+      // 最新画布高度。
       const height = containerRef.value.clientHeight;
       if (!width || !height || (width === graphWidth && height === graphHeight)) return;
       graphWidth = width;
@@ -845,6 +991,7 @@ export function useEnterpriseGraph() {
     });
   }
 
+  // 重置视图缩放和中心点。
   function resetView() {
     if (!graph) return;
     graph.fitCenter();
@@ -854,8 +1001,11 @@ export function useEnterpriseGraph() {
   // 按当前画布中心缩放，不改变已有节点选中和搜索状态。
   function zoomGraph(ratio) {
     if (!graph || !containerRef.value) return;
+    // 当前 G6 缩放比例。
     const currentZoom = graph.getZoom ? graph.getZoom() : 1;
+    // 限制后的下一次缩放比例。
     const nextZoom = Math.min(2.6, Math.max(0.35, currentZoom * ratio));
+    // 以画布中心作为缩放锚点。
     const center = {
       x: containerRef.value.clientWidth / 2,
       y: containerRef.value.clientHeight / 2,
@@ -867,6 +1017,7 @@ export function useEnterpriseGraph() {
   function setGraphMode(mode) {
     if (graphMode.value === mode) return;
     clearPendingNodeClick();
+    // 切换前是否处于多选模式，用于决定是否清空多选态。
     const wasMultiMode = graphMode.value === 'multi';
     graphMode.value = mode;
     if (mode === 'multi') {
@@ -878,7 +1029,9 @@ export function useEnterpriseGraph() {
     refreshCurrentVisualState();
   }
 
+  // 切换图谱区域全屏状态。
   async function toggleFullscreen() {
+    // 当前全屏外壳 DOM。
     const shell = canvasShellRef.value;
     if (!shell) return;
     try {
@@ -888,7 +1041,7 @@ export function useEnterpriseGraph() {
         if (!shell.requestFullscreen) throw new Error('Fullscreen API unavailable');
         await shell.requestFullscreen();
       }
-    } catch (error) {
+    } catch {
       ElMessage.warning('当前浏览器不支持图谱区域全屏');
     }
   }
@@ -904,6 +1057,7 @@ export function useEnterpriseGraph() {
 
   // 点击节点切换多选状态，不触发普通详情和持久聚焦。
   function toggleMultiNode(id) {
+    // 切换后的多选 ID 集合。
     const nextIds = new Set(selectedMultiNodeIds.value);
     if (nextIds.has(id)) nextIds.delete(id);
     else nextIds.add(id);
@@ -911,14 +1065,17 @@ export function useEnterpriseGraph() {
     refreshCurrentVisualState();
   }
 
+  // 从多选结果中移除单个节点。
   function removeMultiNode(id) {
     if (!selectedMultiNodeIds.value.has(id)) return;
+    // 移除后的多选 ID 集合。
     const nextIds = new Set(selectedMultiNodeIds.value);
     nextIds.delete(id);
     selectedMultiNodeIds.value = nextIds;
     refreshCurrentVisualState();
   }
 
+  // 清空多选节点集合。
   function clearMultiSelection() {
     if (!selectedMultiNodeIds.value.size) return;
     selectedMultiNodeIds.value = new Set();
@@ -928,10 +1085,12 @@ export function useEnterpriseGraph() {
   // 全部收起后移除不可见多选节点，避免左侧列表和图谱状态错位。
   function pruneInvisibleMultiSelection() {
     if (!selectedMultiNodeIds.value.size || !manager) return;
+    // 过滤后仍然可见的多选节点 ID 集合。
     const nextIds = new Set([...selectedMultiNodeIds.value].filter((id) => manager.isVisible(id)));
     if (nextIds.size !== selectedMultiNodeIds.value.size) selectedMultiNodeIds.value = nextIds;
   }
 
+  // 根据当前聚焦状态刷新图谱视觉效果。
   function refreshCurrentVisualState() {
     if (!graph) return;
     if (selectedFocusId.value) {
@@ -943,6 +1102,7 @@ export function useEnterpriseGraph() {
     resetGraphVisualState();
   }
 
+  // 格式化多选节点所属路径。
   function formatMultiNodePath(node) {
     if (!manager || !node) return '';
     return manager
@@ -958,6 +1118,7 @@ export function useEnterpriseGraph() {
       ElMessage.warning('请先选择需要导出的节点');
       return;
     }
+    // 导出的多选节点数据。
     const payload = selectedMultiNodes.value.map((node) => ({
       id: node.id,
       label: node.label,
@@ -970,8 +1131,11 @@ export function useEnterpriseGraph() {
       parentLabel: node.parentLabel,
       mapping: node.mapping,
     }));
+    // 下载文件 Blob。
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    // 临时下载 URL。
     const url = URL.createObjectURL(blob);
+    // 临时下载链接。
     const link = document.createElement('a');
     link.href = url;
     link.download = `已选节点-${new Date().toISOString().slice(0, 10)}.json`;
@@ -979,13 +1143,16 @@ export function useEnterpriseGraph() {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  // 适配完整图谱视图。
   function fitFullGraphView() {
     if (!graph) return;
     graph.fitView(42);
   }
 
+  // 适配指定上下文节点集合视图。
   function fitContextView(contextIds, focusId) {
     if (!graph || !containerRef.value) return;
+    // 上下文内可定位的 G6 图元集合。
     const items = [...contextIds].map((id) => graph.findById(id)).filter(Boolean);
     if (!items.length) {
       resetView();
@@ -993,6 +1160,7 @@ export function useEnterpriseGraph() {
     }
 
     if (items.length === 1 && focusId) {
+      // 单节点上下文中的焦点图元。
       const focusItem = graph.findById(focusId);
       graph.zoomTo(1.12);
       if (focusItem) graph.focusItem(focusItem, true);
@@ -1000,17 +1168,23 @@ export function useEnterpriseGraph() {
     }
 
     graph.fitView(58);
+    // fitView 后的当前缩放比例。
     const zoom = graph.getZoom ? graph.getZoom() : 1;
+    // 上下文视图允许的最小缩放。
     const minZoom = items.length <= 6 ? 0.9 : items.length <= 12 ? 0.78 : 0.68;
+    // 上下文视图允许的最大缩放。
     const maxZoom = items.length <= 6 ? 1.18 : 1.08;
     if (zoom < minZoom) graph.zoomTo(minZoom);
     if (zoom > maxZoom) graph.zoomTo(maxZoom);
     graph.fitCenter();
   }
 
+  // 收起后聚焦根节点的默认起始视图。
   function focusRootStartView() {
     if (!graph) return;
+    // 当前可见图中的根节点。
     const rootNode = manager.getVisibleGraph().nodes[0];
+    // 根节点对应的 G6 图元。
     const rootItem = rootNode ? graph.findById(rootNode.id) : undefined;
     graph.zoomTo(1.35);
     if (rootItem) graph.focusItem(rootItem, true);
@@ -1019,6 +1193,7 @@ export function useEnterpriseGraph() {
 
   // 右侧工具栏动作：布局、展开收起、关系文字开关。
   function relayout() {
+    // 当前搜索局部上下文 ID。
     const contextId = getActiveSearchContextId();
     layoutCache.clear();
     ensureSearchContextSelection(contextId);
@@ -1029,7 +1204,9 @@ export function useEnterpriseGraph() {
     }, 180);
   }
 
+  // 展开当前图谱视图，搜索态下只展开搜索上下文。
   function expandAll() {
+    // 当前搜索局部上下文 ID。
     const contextId = getActiveSearchContextId();
     if (contextId) {
       layoutCache.clear();
@@ -1046,7 +1223,9 @@ export function useEnterpriseGraph() {
     window.requestAnimationFrame(() => fitFullGraphView());
   }
 
+  // 收起当前图谱视图，统一回到根节点默认收起视图。
   function collapseAll() {
+    // 当前搜索局部上下文 ID。
     const contextId = getActiveSearchContextId();
     if (!contextId) {
       graphViewMode.value = 'fullGraph';
@@ -1061,6 +1240,7 @@ export function useEnterpriseGraph() {
     window.requestAnimationFrame(() => focusRootStartView());
   }
 
+  // 切换关系文字显示状态。
   function toggleRelationLabels() {
     relationLabelsVisible.value = !relationLabelsVisible.value;
     renderGraph(selectedNode.value?.id);
@@ -1078,6 +1258,7 @@ export function useEnterpriseGraph() {
     message.value = '';
   }
 
+  // 点击搜索结果后进入对应节点的局部关系视图。
   function selectSearchResult(target) {
     clearPendingNodeClick();
     graphViewMode.value = 'searchGraph';
@@ -1088,11 +1269,13 @@ export function useEnterpriseGraph() {
     selectedNode.value = manager.getNode(target.id);
     selectedFocusId.value = target.id;
     renderGraph(target.id);
+    // 搜索目标节点的上下文节点集合。
     const contextIds = manager.getConnectedIds(target.id);
     window.setTimeout(() => fitContextView(contextIds, target.id), 180);
     flashLocatedNode(target.id);
   }
 
+  // 退出搜索局部关系视图并恢复完整图谱。
   function restoreFullGraph() {
     graphViewMode.value = 'fullGraph';
     searchContextId.value = '';
@@ -1119,10 +1302,12 @@ export function useEnterpriseGraph() {
 
   // 搜索局部关系视图只适配当前可见节点，不恢复全量图谱。
   function fitVisibleSearchContextView(contextId) {
+    // 当前可见节点 ID 集合。
     const visibleIds = new Set(manager.getVisibleGraph().nodes.map((node) => node.id));
     fitContextView(visibleIds, manager.isVisible(contextId) ? contextId : '');
   }
 
+  // 停止搜索定位闪烁。
   function stopLocatedFlash() {
     if (locateTimer) window.clearTimeout(locateTimer);
     if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
@@ -1131,16 +1316,20 @@ export function useEnterpriseGraph() {
     locatedNodeId.value = '';
   }
 
+  // 触发搜索定位节点闪烁。
   function flashLocatedNode(id) {
     if (locateTimer) window.clearTimeout(locateTimer);
     if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
     locatedNodeId.value = id;
     applyLocatedState();
+    // 当前闪烁轮次是否显示高亮。
     let visible = true;
+    // 已执行的闪烁次数。
     let blinkCount = 0;
     locateBlinkTimer = window.setInterval(() => {
       visible = !visible;
       blinkCount += 1;
+      // 当前闪烁节点图元。
       const current = graph?.findById(id);
       if (current) updateNodeVisual(current, { hot: visible, opacity: 1 });
       if (blinkCount >= 8) {
@@ -1160,6 +1349,7 @@ export function useEnterpriseGraph() {
     }, 2800);
   }
 
+  // 格式化搜索结果节点路径。
   function searchResultPath(node) {
     return manager
       .getPathNodes(node.id)
@@ -1168,6 +1358,7 @@ export function useEnterpriseGraph() {
       .join(' / ');
   }
 
+  // 格式化搜索结果节点所属体系。
   function searchResultSystem(node) {
     if (node.type === 'root') return '中心主题';
     if (node.type === 'system') return '分类体系';

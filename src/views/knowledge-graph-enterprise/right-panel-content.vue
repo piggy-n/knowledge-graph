@@ -14,11 +14,15 @@ const props = defineProps({
   searchResultPath: { type: Function, required: true },
 });
 
+// 右侧内容组件向页面层发出搜索、布局和局部视图操作。
 const emit = defineEmits(['search', 'expand-all', 'collapse-all', 'toggle-relation-labels', 'relayout', 'select-result', 'restore-full-graph']);
 // 本地输入框值和搜索结果面板折叠状态，避免直接修改父级 props。
 const keyword = ref(props.searchKeyword);
+// 搜索结果面板是否被用户关闭。
 const resultsClosed = ref(false);
+// 搜索结果面板是否折叠。
 const resultsCollapsed = ref(false);
+// 当前点击定位过的搜索结果 ID。
 const activeResultId = ref('');
 // 高频检索词只用于快捷触发搜索，不参与搜索数据处理。
 const quickKeywords = ['耕地', '湿地', '交通', '水域', '盐田', '住宅用地'];

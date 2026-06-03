@@ -12,22 +12,26 @@ const props = defineProps({
   nodeLegendItems: { type: Array, default: () => [] },
   relationLegendItems: { type: Array, default: () => [] },
   activeLegendId: { type: String, default: '' },
-  activeLegendLabel: { type: String, default: '' },
   multiMode: { type: Boolean, default: false },
   multiSelectedNodes: { type: Array, default: () => [] },
   multiNodePath: { type: Function, default: () => '' },
 });
 
+// 左侧面板向页面层发出图例、多选移除、清空和下载操作。
 const emit = defineEmits(['legend-hover', 'legend-toggle', 'remove-multi-node', 'clear-multi-selection', 'download-multi-selection']);
 
+// 子节点表格当前页码。
 const childPage = ref(1);
+// 子节点表格每页展示数量。
 const childPageSize = 5;
 
 // 节点基础字段按展示需要过滤空值，避免详情区出现空行。
 const rows = computed(() => {
+  // 当前详情节点。
   const node = props.node;
   if (!node) return [];
 
+  // 当前节点所属体系展示文案。
   const systemLabel =
       node.system === 'survey'
           ? '国土调查工作分类'
@@ -35,7 +39,9 @@ const rows = computed(() => {
               ? '国土空间用地用海分类'
               : node.system;
 
+  // 是否为分类层级节点。
   const isCategoryNode = ['一级类', '二级类', '三级类'].includes(node.levelName);
+  // 分类节点和明细节点使用不同基础字段。
   const identityRows = isCategoryNode
       ? [['分类标识', formatNodeName(node)]]
       : [
@@ -54,6 +60,7 @@ const rows = computed(() => {
 
 // 子节点表格分页只影响当前详情面板展示，不改变图谱展开状态。
 const pagedChildren = computed(() => {
+  // 当前页起始索引。
   const start = (childPage.value - 1) * childPageSize;
   return props.children.slice(start, start + childPageSize);
 });

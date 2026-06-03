@@ -8,6 +8,7 @@ defineProps({
   isFullscreen: { type: Boolean, default: false },
 });
 
+// 画布组件向组合式逻辑回传 DOM 和工具栏操作。
 const emit = defineEmits(['container-change', 'shell-change', 'toggle-fullscreen', 'zoom', 'mode-change']);
 // 工具栏 tooltip 关闭延迟和动画，避免连续悬停时残留。
 const toolbarTooltipProps = {
