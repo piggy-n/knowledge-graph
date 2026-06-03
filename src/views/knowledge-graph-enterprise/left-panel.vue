@@ -322,7 +322,7 @@ watch(
   margin: 0;
   padding-left: 10px;
   color: var(--kg-text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -475,7 +475,7 @@ watch(
 
 .kg-child-level {
   color: var(--kg-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   white-space: normal;
   word-break: break-word;
@@ -546,7 +546,7 @@ watch(
 }
 
 :deep(.kg-child-pager .el-pagination) {
-  --el-pagination-font-size: 11px;
+  --el-pagination-font-size: 12px;
   --el-pagination-button-width: auto;
   --el-pagination-button-height: 22px;
   --el-pagination-button-gap: 2px;
@@ -647,7 +647,7 @@ watch(
 .kg-multi-card__main p {
   margin: 0;
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
   white-space: normal;
@@ -688,7 +688,7 @@ watch(
 
 .kg-overview-card dt {
   color: var(--kg-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
   white-space: normal;
@@ -739,7 +739,7 @@ watch(
   border-radius: 6px;
   background: transparent;
   color: #1f2937;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.3;
   text-align: left;
@@ -779,16 +779,5 @@ watch(
   min-width: 0;
   white-space: normal;
   word-break: break-word;
-}
-
-.kg-legend-hint {
-  margin-top: 10px;
-  padding: 6px 8px;
-  border-radius: 7px;
-  background: rgba(239, 246, 255, 0.85);
-  color: #1d4ed8;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.35;
 }
 </style>

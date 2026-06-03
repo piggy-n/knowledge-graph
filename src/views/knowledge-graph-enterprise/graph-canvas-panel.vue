@@ -177,7 +177,7 @@ function setShellRef(element) {
 }
 
 .kg-graph-op-button .el-icon {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .kg-graph-op-divider {

@@ -239,7 +239,7 @@ function closeResults() {
 
 :deep(.kg-enterprise-search .el-input__inner) {
   color: #0f172a;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -254,7 +254,7 @@ function closeResults() {
 .kg-enterprise-quick-label {
   margin-right: 4px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1;
 }
@@ -277,7 +277,7 @@ function closeResults() {
   color: #1e3a5f;
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(37, 99, 235, 0.18);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -331,7 +331,7 @@ function closeResults() {
 .kg-display-setting {
   gap: 8px;
   color: #334155;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -430,7 +430,7 @@ function closeResults() {
 .kg-enterprise-results-title strong {
   display: block;
   color: #0f172a;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.25;
 }
@@ -438,7 +438,7 @@ function closeResults() {
 .kg-enterprise-results-title p {
   margin: 3px 0 0;
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
 }
@@ -458,7 +458,7 @@ function closeResults() {
 
 .kg-enterprise-results-tools > span {
   color: #475569;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -584,7 +584,7 @@ function closeResults() {
   border-radius: 6px;
   background: rgba(219, 234, 254, 0.9);
   color: #2563eb;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   box-sizing: border-box;
 }
@@ -597,7 +597,7 @@ function closeResults() {
 .kg-enterprise-result-main strong {
   display: block;
   color: #0f172a;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.4;
   white-space: normal;
@@ -608,7 +608,7 @@ function closeResults() {
   display: block;
   margin-top: 4px;
   color: #475569;
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 500;
   line-height: 1.45;
