@@ -69,12 +69,20 @@ function handleQuickSearch(value) {
           {{ relationLabelsVisible ? '隐藏关系文字' : '显示关系文字' }}
         </ElButton>
         <ElButton :icon="Refresh" class="kg-toolbar__ghost" @click="emit('relayout')">重算布局</ElButton>
-        <ElButton :icon="Back" @click="emit('restore-full-graph')">返回全部图谱</ElButton>
       </div>
     </header>
 
     <section class="kg-stage kg-stage--light kg-enterprise-stage">
       <div v-if="message" class="kg-message">{{ message }}</div>
+      <ElButton
+        v-if="searchFocusActive"
+        type="primary"
+        :icon="Back"
+        class="kg-enterprise-focus-exit"
+        @click="emit('restore-full-graph')"
+      >
+        返回全部图谱
+      </ElButton>
       <div v-if="searchResults.length" class="kg-search-results kg-enterprise-results">
         <div class="kg-search-results__header">
           <strong>搜索结果</strong>
@@ -195,6 +203,25 @@ function handleQuickSearch(value) {
 .kg-enterprise-stage {
   flex: 1;
   min-height: 0;
+}
+
+.kg-enterprise-focus-exit {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 8;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #2563eb;
+  border-color: #2563eb;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.18);
+  font-weight: 700;
+}
+
+.kg-enterprise-focus-exit:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .kg-enterprise-results {
