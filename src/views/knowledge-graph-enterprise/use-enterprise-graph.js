@@ -530,6 +530,8 @@ export function useEnterpriseGraph() {
     const labelText = simplifyEdgeLabel(edge);
     // 当前开关状态下实际显示的关系文字。
     const label = relationLabelsVisible.value && isDefaultVisibleLabel(edge) ? labelText : '';
+    // 当前关系文字背景，文字隐藏时同步隐藏背景块。
+    const labelBackground = edgeLabelBackground(false, Boolean(label));
     // 当前关系线宽。
     const lineWidth = edgeLineWidth(edge);
     // 当前关系线默认样式，聚焦后会基于该样式恢复。
@@ -559,11 +561,7 @@ export function useEnterpriseGraph() {
           fill: mapping ? '#b45309' : '#64748b',
           fontSize: 10,
           fontWeight: mapping ? 700 : 500,
-          background: {
-            fill: 'rgba(255, 255, 255, 0.78)',
-            padding: [2, 4, 2, 4],
-            radius: 4,
-          },
+          background: labelBackground,
         },
       },
       originStyle: { ...edgeStyle },
@@ -672,8 +670,12 @@ export function useEnterpriseGraph() {
     updateEdgeVisual(item, active, options);
     // 默认关系文字，受“显示关系文字”开关控制。
     const defaultLabel = relationLabelsVisible.value && model.originLabel && (model.relationType === 'hierarchy' || model.relationType === 'mapping') ? model.originLabel : '';
+    // 当前最终显示的关系文字。
+    const nextLabel = forceHidden ? '' : active && relationLabelsVisible.value ? model.originLabel : defaultLabel;
+    // 当前关系文字背景，文字为空时不保留底块。
+    const nextBackground = edgeLabelBackground(active, Boolean(nextLabel));
     graph.updateItem(item, {
-      label: forceHidden ? '' : active && relationLabelsVisible.value ? model.originLabel : defaultLabel,
+      label: nextLabel,
       labelCfg: {
         ...model.labelCfg,
         style: {
@@ -681,14 +683,26 @@ export function useEnterpriseGraph() {
           fill: active ? '#0f172a' : model.originLabelFill || model.labelCfg?.style?.fill,
           fontSize: active ? 12 : model.originFontSize || model.labelCfg?.style?.fontSize,
           fontWeight: active ? 800 : model.originFontWeight || model.labelCfg?.style?.fontWeight,
-          background: {
-            fill: active ? 'rgba(255, 247, 237, 0.96)' : 'rgba(255, 255, 255, 0.78)',
-            padding: [3, 6, 3, 6],
-            radius: 5,
-          },
+          background: nextBackground,
         },
       },
     });
+  }
+
+  // 根据关系文字可见性返回背景配置，隐藏文字时去掉可见底块和占位 padding。
+  function edgeLabelBackground(active, visible) {
+    if (!visible) {
+      return {
+        fill: 'rgba(255, 255, 255, 0)',
+        padding: [0, 0, 0, 0],
+        radius: 0,
+      };
+    }
+    return {
+      fill: active ? 'rgba(255, 247, 237, 0.96)' : 'rgba(255, 255, 255, 0.78)',
+      padding: active ? [3, 6, 3, 6] : [2, 4, 2, 4],
+      radius: active ? 5 : 4,
+    };
   }
 
   // 更新关系线条、箭头和透明度。
