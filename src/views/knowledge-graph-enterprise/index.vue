@@ -2,7 +2,8 @@
 import G6 from '@antv/g6';
 import * as d3 from 'd3';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElIcon, ElMessage, ElTooltip } from 'element-plus';
+import { FullScreen, Mouse, Pointer, Select, ZoomIn, ZoomOut } from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 import LeftPanel from './left-panel.vue';
 import RightPanel from './right-panel.vue';
@@ -11,6 +12,7 @@ import { formatNodeName, transformKnowledgeGraph } from './graph-data';
 import { GraphExpandManager } from './graph-expand-manager';
 
 const containerRef = ref(null);
+const canvasShellRef = ref(null);
 const selectedNode = ref();
 const message = ref('');
 const relationLabelsVisible = ref(true);
@@ -22,6 +24,11 @@ const selectedFocusId = ref('');
 const overviewItems = ref([]);
 const activeLegendId = ref('');
 const hoveredLegendId = ref('');
+// 图谱交互模式：选择、漫游、多选三者互斥。
+const graphMode = ref('select');
+const isFullscreen = ref(false);
+// 多选节点 ID 集合，用于在重新渲染后恢复节点选中态。
+const selectedMultiNodeIds = ref(new Set());
 let graph;
 let manager;
 let graphRendered = false;
@@ -50,6 +57,12 @@ const activeLegendLabel = computed(() => {
 const nodeLegendItems = computed(() => legendItems.filter((item) => item.type));
 const relationLegendItems = computed(() => legendItems.filter((item) => item.lineType));
 const selectedChildren = computed(() => (selectedNode.value && manager ? manager.getChildren(selectedNode.value.id) : []));
+const selectedMultiNodes = computed(() => {
+  if (!manager) return [];
+  return [...selectedMultiNodeIds.value]
+    .map((id) => manager.getNode(id))
+    .filter(Boolean);
+});
 
 try {
   const dataset = transformKnowledgeGraph(rawGraphData);
@@ -65,6 +78,7 @@ onMounted(async () => {
   if (!manager || !containerRef.value) return;
   mountGraphWhenReady();
   window.addEventListener('resize', resizeGraph);
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
 });
 
 onBeforeUnmount(() => {
@@ -72,6 +86,7 @@ onBeforeUnmount(() => {
   if (locateTimer) window.clearTimeout(locateTimer);
   if (locateBlinkTimer) window.clearInterval(locateBlinkTimer);
   window.removeEventListener('resize', resizeGraph);
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
   graph?.destroy();
   graph = undefined;
   graphRendered = false;
@@ -132,6 +147,11 @@ function initGraph() {
   graph.on('node:click', (event) => {
     const id = event.item?.getModel()?.id;
     if (!id) return;
+    if (graphMode.value === 'multi') {
+      toggleMultiNode(id);
+      return;
+    }
+    if (graphMode.value !== 'select') return;
     selectedNode.value = manager.getNode(id);
     selectedFocusId.value = id;
     applySelectedFocus();
@@ -140,6 +160,7 @@ function initGraph() {
   graph.on('node:dblclick', (event) => {
     const id = event.item?.getModel()?.id;
     if (!id) return;
+    if (graphMode.value !== 'select') return;
     manager.toggle(id);
     selectedNode.value = manager.getNode(id);
     selectedFocusId.value = id;
@@ -147,6 +168,7 @@ function initGraph() {
   });
 
   graph.on('canvas:click', () => {
+    if (graphMode.value === 'multi') return;
     selectedNode.value = undefined;
     selectedFocusId.value = '';
     stopLocatedFlash();
@@ -154,20 +176,24 @@ function initGraph() {
   });
 
   graph.on('node:mouseenter', (event) => {
+    if (graphMode.value !== 'select') return;
     const id = event.item?.getModel()?.id;
     if (!id) return;
     applyHover(id);
   });
 
   graph.on('node:mouseleave', () => {
+    if (graphMode.value !== 'select') return;
     clearHover();
   });
 
   graph.on('edge:mouseenter', (event) => {
+    if (graphMode.value !== 'select') return;
     if (event.item) applyEdgeHover(event.item);
   });
 
   graph.on('edge:mouseleave', (event) => {
+    if (graphMode.value !== 'select') return;
     if (event.item) {
       clearHover();
     }
@@ -586,6 +612,7 @@ function updateNodeVisual(item, options = {}) {
   const baseStyle = model.originStyle || model.style || {};
   const labelStyle = model.labelCfg?.originStyle || model.labelCfg?.style || {};
   const lineWidth = Number(baseStyle.lineWidth || 2);
+  const multiSelected = selectedMultiNodeIds.value.has(model.id);
   const style = {
     ...baseStyle,
     opacity: options.opacity ?? (options.dim ? 0.14 : baseStyle.opacity ?? 0.92),
@@ -605,6 +632,16 @@ function updateNodeVisual(item, options = {}) {
       shadowColor: '#f59e0b',
       shadowBlur: 24,
       opacity: 1,
+    });
+  }
+
+  if (multiSelected) {
+    Object.assign(style, {
+      stroke: '#2563eb',
+      lineWidth: Math.max(5, lineWidth + 2.4),
+      shadowColor: '#2563eb',
+      shadowBlur: 28,
+      opacity: Math.max(Number(style.opacity ?? 0), 0.92),
     });
   }
 
@@ -674,6 +711,134 @@ function resetView() {
   graph.zoomTo(1);
 }
 
+// 按当前画布中心缩放，不改变已有节点选中和搜索状态。
+function zoomGraph(ratio) {
+  if (!graph || !containerRef.value) return;
+  const currentZoom = graph.getZoom ? graph.getZoom() : 1;
+  const nextZoom = Math.min(2.6, Math.max(0.35, currentZoom * ratio));
+  const center = {
+    x: containerRef.value.clientWidth / 2,
+    y: containerRef.value.clientHeight / 2,
+  };
+  graph.zoomTo(nextZoom, center);
+}
+
+// 切换互斥模式，并同步清理会冲突的临时视觉状态。
+function setGraphMode(mode) {
+  if (graphMode.value === mode) return;
+  const wasMultiMode = graphMode.value === 'multi';
+  graphMode.value = mode;
+  if (mode === 'multi') {
+    selectedFocusId.value = '';
+    stopLocatedFlash();
+    resetGraphVisualState();
+    return;
+  }
+  if (wasMultiMode) clearMultiSelection();
+  refreshCurrentVisualState();
+}
+
+async function toggleFullscreen() {
+  const shell = canvasShellRef.value;
+  if (!shell) return;
+  try {
+    if (document.fullscreenElement === shell) {
+      await document.exitFullscreen?.();
+    } else {
+      if (!shell.requestFullscreen) throw new Error('Fullscreen API unavailable');
+      await shell.requestFullscreen();
+    }
+  } catch (error) {
+    ElMessage.warning('当前浏览器不支持图谱区域全屏');
+  }
+}
+
+// 全屏状态变化后延迟 resize，等待浏览器完成容器尺寸更新。
+function handleFullscreenChange() {
+  isFullscreen.value = document.fullscreenElement === canvasShellRef.value;
+  window.setTimeout(() => {
+    resizeGraph();
+    graph?.fitCenter();
+  }, 80);
+}
+
+// 点击节点切换多选状态，不触发普通详情和持久聚焦。
+function toggleMultiNode(id) {
+  const nextIds = new Set(selectedMultiNodeIds.value);
+  if (nextIds.has(id)) nextIds.delete(id);
+  else nextIds.add(id);
+  selectedMultiNodeIds.value = nextIds;
+  refreshCurrentVisualState();
+}
+
+function removeMultiNode(id) {
+  if (!selectedMultiNodeIds.value.has(id)) return;
+  const nextIds = new Set(selectedMultiNodeIds.value);
+  nextIds.delete(id);
+  selectedMultiNodeIds.value = nextIds;
+  refreshCurrentVisualState();
+}
+
+function clearMultiSelection() {
+  if (!selectedMultiNodeIds.value.size) return;
+  selectedMultiNodeIds.value = new Set();
+  refreshCurrentVisualState();
+}
+
+// 全部收起后移除不可见多选节点，避免左侧列表和图谱状态错位。
+function pruneInvisibleMultiSelection() {
+  if (!selectedMultiNodeIds.value.size || !manager) return;
+  const nextIds = new Set([...selectedMultiNodeIds.value].filter((id) => manager.isVisible(id)));
+  if (nextIds.size !== selectedMultiNodeIds.value.size) selectedMultiNodeIds.value = nextIds;
+}
+
+function refreshCurrentVisualState() {
+  if (!graph) return;
+  if (selectedFocusId.value) {
+    applyLegendState();
+    applySelectedFocus();
+    applyLocatedState();
+    return;
+  }
+  resetGraphVisualState();
+}
+
+function formatMultiNodePath(node) {
+  if (!manager || !node) return '';
+  return manager
+    .getPathNodes(node.id)
+    .filter((item) => item.type !== 'root')
+    .map((item) => formatNodeName(item))
+    .join(' / ');
+}
+
+// 导出当前多选节点基础信息，独立于搜索结果数据。
+function downloadSelectedNodes() {
+  if (!selectedMultiNodes.value.length) {
+    ElMessage.warning('请先选择需要导出的节点');
+    return;
+  }
+  const payload = selectedMultiNodes.value.map((node) => ({
+    id: node.id,
+    label: node.label,
+    name: node.name,
+    code: node.code,
+    displayName: formatNodeName(node),
+    categoryPath: formatMultiNodePath(node),
+    system: searchResultSystem(node),
+    levelName: node.levelName,
+    parentLabel: node.parentLabel,
+    mapping: node.mapping,
+  }));
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `已选节点-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function fitFullGraphView() {
   if (!graph) return;
   graph.fitView(42);
@@ -728,6 +893,7 @@ function expandAll() {
 function collapseAll() {
   searchFocusActive.value = false;
   manager.collapseAll();
+  pruneInvisibleMultiSelection();
   layoutCache.clear();
   selectedNode.value = manager.getVisibleGraph().nodes[0];
   renderGraph(selectedNode.value?.id);
@@ -830,6 +996,9 @@ function searchResultSystem(node) {
     <LeftPanel
       :node="selectedNode"
       :children="selectedChildren"
+      :multi-mode="graphMode === 'multi'"
+      :multi-selected-nodes="selectedMultiNodes"
+      :multi-node-path="formatMultiNodePath"
       :overview-items="overviewItems"
       :node-legend-items="nodeLegendItems"
       :relation-legend-items="relationLegendItems"
@@ -837,6 +1006,9 @@ function searchResultSystem(node) {
       :active-legend-label="activeLegendLabel"
       @legend-hover="setLegendHover"
       @legend-toggle="toggleLegend"
+      @remove-multi-node="removeMultiNode"
+      @clear-multi-selection="clearMultiSelection"
+      @download-multi-selection="downloadSelectedNodes"
     />
     <RightPanel
       :search-keyword="searchKeyword"
@@ -854,7 +1026,73 @@ function searchResultSystem(node) {
       @restore-full-graph="restoreFullGraph"
     >
       <template #canvas>
-        <div ref="containerRef" class="kg-canvas"></div>
+        <div
+          ref="canvasShellRef"
+          class="kg-canvas-shell"
+          :class="{
+            'is-roam': graphMode === 'roam',
+            'is-fullscreen': isFullscreen,
+          }"
+        >
+          <div ref="containerRef" class="kg-canvas"></div>
+          <nav class="kg-graph-ops-toolbar" aria-label="图谱操作工具栏">
+            <ElTooltip content="全屏" placement="left">
+              <button
+                type="button"
+                class="kg-graph-op-button"
+                :class="{ 'is-active': isFullscreen }"
+                aria-label="全屏"
+                @click="toggleFullscreen"
+              >
+                <ElIcon><FullScreen /></ElIcon>
+              </button>
+            </ElTooltip>
+            <ElTooltip content="放大" placement="left">
+              <button type="button" class="kg-graph-op-button" aria-label="放大" @click="zoomGraph(1.16)">
+                <ElIcon><ZoomIn /></ElIcon>
+              </button>
+            </ElTooltip>
+            <ElTooltip content="缩小" placement="left">
+              <button type="button" class="kg-graph-op-button" aria-label="缩小" @click="zoomGraph(0.86)">
+                <ElIcon><ZoomOut /></ElIcon>
+              </button>
+            </ElTooltip>
+            <span class="kg-graph-op-divider"></span>
+            <ElTooltip content="选择模式" placement="left">
+              <button
+                type="button"
+                class="kg-graph-op-button"
+                :class="{ 'is-active': graphMode === 'select' }"
+                aria-label="选择模式"
+                @click="setGraphMode('select')"
+              >
+                <ElIcon><Pointer /></ElIcon>
+              </button>
+            </ElTooltip>
+            <ElTooltip content="漫游模式" placement="left">
+              <button
+                type="button"
+                class="kg-graph-op-button"
+                :class="{ 'is-active': graphMode === 'roam' }"
+                aria-label="漫游模式"
+                @click="setGraphMode('roam')"
+              >
+                <ElIcon><Mouse /></ElIcon>
+              </button>
+            </ElTooltip>
+            <ElTooltip content="多选模式" placement="left">
+              <button
+                type="button"
+                class="kg-graph-op-button"
+                :class="{ 'is-active': graphMode === 'multi' }"
+                aria-label="多选模式"
+                @click="setGraphMode('multi')"
+              >
+                <ElIcon><Select /></ElIcon>
+              </button>
+            </ElTooltip>
+          </nav>
+        </div>
       </template>
     </RightPanel>
   </section>
@@ -868,6 +1106,96 @@ function searchResultSystem(node) {
   min-height: 0;
   overflow: hidden;
   contain: layout paint size;
+}
+
+.kg-canvas-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    #f8fbff;
+  background-size: 32px 32px;
+}
+
+.kg-canvas-shell.is-fullscreen {
+  background:
+    linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    #f8fbff;
+  background-size: 32px 32px;
+}
+
+.kg-canvas-shell.is-roam,
+.kg-canvas-shell.is-roam .kg-canvas,
+.kg-canvas-shell.is-roam :deep(canvas) {
+  cursor: grab;
+}
+
+.kg-canvas-shell.is-roam:active,
+.kg-canvas-shell.is-roam:active .kg-canvas,
+.kg-canvas-shell.is-roam:active :deep(canvas) {
+  cursor: grabbing;
+}
+
+.kg-graph-ops-toolbar {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.kg-graph-op-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.kg-graph-op-button:hover {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: #eff6ff;
+  color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+
+.kg-graph-op-button.is-active {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.24);
+}
+
+.kg-graph-op-button .el-icon {
+  font-size: 17px;
+}
+
+.kg-graph-op-divider {
+  display: block;
+  width: 24px;
+  height: 1px;
+  margin: 2px auto;
+  background: rgba(148, 163, 184, 0.28);
 }
 
 </style>

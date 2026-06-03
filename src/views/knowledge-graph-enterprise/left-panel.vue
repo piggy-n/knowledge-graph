@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { ElEmpty, ElPagination, ElTable, ElTableColumn } from 'element-plus';
+import { ElButton, ElEmpty, ElPagination, ElTable, ElTableColumn, ElTag } from 'element-plus';
+import { Close, Download } from '@element-plus/icons-vue';
 import { formatNodeName } from './graph-data';
 
 const props = defineProps({
@@ -11,9 +12,12 @@ const props = defineProps({
   relationLegendItems: { type: Array, default: () => [] },
   activeLegendId: { type: String, default: '' },
   activeLegendLabel: { type: String, default: '' },
+  multiMode: { type: Boolean, default: false },
+  multiSelectedNodes: { type: Array, default: () => [] },
+  multiNodePath: { type: Function, default: () => '' },
 });
 
-const emit = defineEmits(['legend-hover', 'legend-toggle']);
+const emit = defineEmits(['legend-hover', 'legend-toggle', 'remove-multi-node', 'clear-multi-selection', 'download-multi-selection']);
 
 const childPage = ref(1);
 const childPageSize = 5;
@@ -51,6 +55,14 @@ const pagedChildren = computed(() => {
   return props.children.slice(start, start + childPageSize);
 });
 
+// 多选卡片补充分级路径，复用左侧详情区域展示。
+const multiSelectedCards = computed(() => {
+  return props.multiSelectedNodes.map((node) => ({
+    node,
+    path: props.multiNodePath(node),
+  }));
+});
+
 watch(
     () => [props.node?.id, props.children.length],
     () => {
@@ -63,11 +75,61 @@ watch(
   <aside class="kg-enterprise-left">
     <section class="kg-left-panel kg-left-panel--detail">
       <header class="kg-left-panel__header">
-        <h2 class="kg-left-panel__title">节点详情</h2>
+        <h2 class="kg-left-panel__title">{{ multiMode ? '已选节点' : '节点详情' }}</h2>
+        <div v-if="multiMode" class="kg-left-panel__header-actions">
+          <ElButton
+            class="kg-left-panel__icon-button"
+            :icon="Download"
+            circle
+            size="small"
+            title="下载已选节点"
+            :disabled="!multiSelectedNodes.length"
+            @click="emit('download-multi-selection')"
+          />
+        </div>
       </header>
 
       <div class="kg-left-panel__content kg-detail-content">
-        <template v-if="node">
+        <template v-if="multiMode">
+          <div class="kg-multi-summary">
+            <span>已选 {{ multiSelectedNodes.length }} 个节点</span>
+            <ElButton
+              class="kg-multi-clear"
+              size="small"
+              text
+              :disabled="!multiSelectedNodes.length"
+              @click="emit('clear-multi-selection')"
+            >
+              清空选择
+            </ElButton>
+          </div>
+
+          <div v-if="multiSelectedCards.length" class="kg-multi-list">
+            <article v-for="card in multiSelectedCards" :key="card.node.id" class="kg-multi-card">
+              <div class="kg-multi-card__main">
+                <strong>{{ formatNodeName(card.node) }}</strong>
+                <p>{{ card.path || card.node.parentLabel || '未分组' }}</p>
+                <ElTag v-if="card.node.levelName" class="kg-multi-card__tag" size="small" effect="plain">
+                  {{ card.node.levelName }}
+                </ElTag>
+              </div>
+              <ElButton
+                class="kg-multi-card__remove"
+                :icon="Close"
+                circle
+                size="small"
+                title="移除节点"
+                @click="emit('remove-multi-node', card.node.id)"
+              />
+            </article>
+          </div>
+
+          <div v-else class="kg-detail-empty">
+            <ElEmpty description="请选择需要导出的节点" :image-size="64" />
+          </div>
+        </template>
+
+        <template v-else-if="node">
           <section class="kg-detail-section">
             <div class="kg-detail-subtitle">
               <span>基础信息</span>
@@ -246,6 +308,7 @@ watch(
   display: flex;
   flex: 0 0 38px;
   align-items: center;
+  justify-content: space-between;
   height: 38px;
   padding: 0 var(--kg-panel-padding-x);
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
@@ -274,6 +337,17 @@ watch(
   background: var(--kg-title-blue);
   transform: translateY(-50%);
   content: '';
+}
+
+.kg-left-panel__header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.kg-left-panel__icon-button {
+  --el-button-size: 24px;
 }
 
 .kg-left-panel__content {
@@ -513,6 +587,81 @@ watch(
   align-items: center;
   justify-content: center;
   min-height: 100%;
+}
+
+.kg-multi-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kg-multi-summary span {
+  min-width: 0;
+}
+
+.kg-multi-clear {
+  flex: 0 0 auto;
+}
+
+.kg-multi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.kg-multi-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.96);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.kg-multi-card__main {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kg-multi-card__main strong {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.kg-multi-card__main p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.kg-multi-card__tag {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.kg-multi-card__remove {
+  flex: 0 0 auto;
+  margin-top: -2px;
 }
 
 .kg-overview-grid {
