@@ -18,7 +18,7 @@ const keyword = ref(props.searchKeyword);
 const resultsClosed = ref(false);
 const resultsCollapsed = ref(false);
 const activeResultId = ref('');
-const quickKeywords = ['用地', '耕地', '湿地', '交通', '水域'];
+const quickKeywords = ['耕地', '湿地', '交通', '水域', '盐田', '住宅用地'];
 
 watch(
   () => props.searchKeyword,
