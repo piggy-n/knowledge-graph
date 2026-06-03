@@ -403,15 +403,11 @@ export function useEnterpriseGraph() {
     const maxLines = node.type === 'root' || node.type === 'system' ? 3 : 2;
     let fontSize = 10;
 
-    if (length <= 2) fontSize = Math.min(22, radius * 0.62);
-    else if (length <= 4) fontSize = Math.min(20, radius * 0.56);
-    else fontSize = Math.max(10, Math.min(18, radius * 0.5));
-
-    // if (length <= 2) fontSize = Math.min(22, radius * 0.62);
-    // else if (length <= 3) fontSize = Math.min(20, radius * 0.56);
-    // else if (length <= 5) fontSize = Math.min(16, radius * 0.44);
-    // else if (length <= 8) fontSize = Math.min(14, radius * 0.36);
-    // else fontSize = Math.max(10, Math.min(12, radius * 0.3));
+    if (length <= 2) fontSize = Math.min(24, radius * 0.68);
+    else if (length <= 3) fontSize = Math.min(22, radius * 0.62);
+    else if (length <= 5) fontSize = Math.min(20, radius * 0.56);
+    else if (length <= 8) fontSize = Math.min(16, radius * 0.44);
+    else fontSize = Math.max(10, Math.min(14, radius * 0.38));
 
     const maxCharsPerLine = Math.max(2, Math.floor((radius * 1.52) / fontSize));
     const lines = wrapG6Text(name, maxCharsPerLine, maxLines);

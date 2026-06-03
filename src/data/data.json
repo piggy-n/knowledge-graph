@@ -1,5 +1,5 @@
 {
-  "title": "用地用海分类知识图谱",
+  "title": "用地用海分类与国土调查工作分类知识图谱",
   "description": "根据《数据.pdf》附录I表I重新整理的干净知识图谱数据。对应关系仅保留同名分类虚线关系。",
   "source": "C:\\Users\\13273\\Desktop\\数据.pdf",
   "notes": [
@@ -8,12 +8,12 @@
   "nodes": [
     {
       "id": "root",
-      "label": "用地用海分类知识图谱",
+      "label": "用地用海分类与国土调查工作分类知识图谱",
       "type": "root",
       "system": "",
       "level": null,
       "code": "",
-      "name": "用地用海分类知识图谱",
+      "name": "用地用海分类与国土调查工作分类知识图谱",
       "levelName": "中心主题",
       "parentId": null
     },

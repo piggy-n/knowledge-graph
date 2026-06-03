@@ -8,13 +8,15 @@ const TYPE_COLORS= {
 };
 
 const TYPE_SIZES= {
-  root: 116,
-  system: 92,
-  'survey-category': 78,
-  'planning-category': 78,
-  'survey-detail': 62,
-  'planning-detail': 62,
+  root: 145,
+  system: 115,
+  'survey-category': 98,
+  'planning-category': 98,
+  'survey-detail': 77,
+  'planning-detail': 77,
 };
+
+const DETAIL_NODE_SIZE = 57;
 
 const HIERARCHY_LABELS = new Set(['左侧分类体系', '右侧分类体系', '分类体系', '包含']);
 
@@ -39,7 +41,7 @@ export function transformKnowledgeGraph(raw) {
       childrenCount: 0,
       x: 0,
       y: 0,
-      size: (node.level || 0) >= 3 ? 52 : TYPE_SIZES[node.type] || 38,
+      size: resolveNodeSize(node.type, node.level, node.levelName),
       color: resolveNodeColor(node.type, node.level, node.levelName),
     });
   });
@@ -84,7 +86,7 @@ export function transformKnowledgeGraph(raw) {
         childrenCount: 0,
         x: parent.x,
         y: parent.y,
-        size: childLevel >= 4 ? 52 : TYPE_SIZES[childType],
+        size: resolveNodeSize(childType, childLevel, child.levelName),
         color: resolveNodeColor(childType, childLevel, child.levelName),
       });
       appendChild(childrenMap, parentId, childId);
@@ -153,8 +155,10 @@ function resolveNodeColor(type, level, levelName) {
   return TYPE_COLORS[type] || '#64748b';
 }
 
-export function shortLabel(label, max = 12) {
-  return label.length > max ? `${label.slice(0, max)}...` : label;
+// 根据层级返回固定节点尺寸，避免运行时按比例反复计算。
+function resolveNodeSize(type, level, levelName) {
+  if ((level || 0) >= 3 || levelName === '三级类') return DETAIL_NODE_SIZE;
+  return TYPE_SIZES[type] || 38;
 }
 
 export function formatNodeName(node) {
