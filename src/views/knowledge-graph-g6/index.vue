@@ -800,7 +800,7 @@ function switchVersion() {
   <section class="kg-page kg-page--g6">
     <KnowledgeGraphToolbar
       title="G6 知识图谱"
-      subtitle="企业级用地用海分类关系展示"
+      subtitle="用地用海分类关系展示"
       switch-text="切换 D3 版本"
       @search="searchNode"
       @reset="resetView"

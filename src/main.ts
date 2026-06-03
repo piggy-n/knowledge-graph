@@ -27,7 +27,7 @@ const routes = [
     path: '/knowledge-graph-enterprise',
     name: 'KnowledgeGraphEnterprise',
     component: EnterpriseKnowledgeGraph,
-    meta: { title: '企业版 G6 知识图谱' },
+    meta: { title: ' G6 知识图谱' },
   },
 ];
 

@@ -6,7 +6,7 @@ import rawGraphData from '../../data/data.json';
 import { formatNodeName, transformKnowledgeGraph } from './graph-data';
 import { GraphExpandManager } from './graph-expand-manager';
 
-// 企业版图谱页面的组合式逻辑入口，集中维护图谱状态和交互方法。
+// 图谱页面的组合式逻辑入口，集中维护图谱状态和交互方法。
 export function useEnterpriseGraph() {
   // G6 渲染容器引用，由画布组件回传。
   const containerRef = ref(null);
